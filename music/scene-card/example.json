@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "name": "photo_8f3a2c",
+  "place": { "label": "waterfront", "confidence": 0.86 },
+  "time_of_day": "morning",
+  "mood": { "brightness": 0.72, "warmth": 0.1, "saturation": 0.34, "contrast": 0.22, "n_colours": 4 },
+  "stops": [
+    ["#cfe3f2", 0.35, 0.1],
+    ["#f4c9a8", 0.12, 0.3],
+    ["#5f9cc4", 0.28, 0.55],
+    ["#e6d6bc", 0.25, 0.88]
+  ]
+}
