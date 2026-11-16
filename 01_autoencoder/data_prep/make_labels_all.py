@@ -30,6 +30,9 @@ def main():
     df = (lab.drop(columns=["keep"], errors="ignore")
              .merge(cl, on="file", how="left").merge(pal, on="file", how="left").merge(gm, on="file", how="left")
              .rename(columns={"stops": "gradient_stops", "palette": "palette_colours"}))
+    det = DATA / "details.csv"
+    if det.exists():
+        df = df.merge(pd.read_csv(det), on="file", how="left")
     other = df["place"] == "other"
     df.loc[other, "keep"] = 0
     df.loc[other & (df["reason"] == ""), "reason"] = "not one of our places"
@@ -39,6 +42,10 @@ def main():
             "time", "time_conf", "time_true", "season", "season_conf", "season_true",
             "brightness", "saturation", "contrast", "warmth", "n_colours", "palette_colours",
             "gradient_stops", "gradient_png", "scale", "chords", "sevenths", "tone", "melody", "drums",
+            "top_elements", "elements", "fam_architecture", "fam_street_furniture", "fam_furniture",
+            "fam_paving", "fam_nature", "fam_sky", "fam_people", "fam_vehicles", "fam_goods",
+            "paving_material", "paving_material_conf", "architecture_style", "architecture_style_conf",
+            "facade_detail", "facade_detail_conf", "clothing", "clothing_conf", "segmentation_png",
             "licence", "author", "url"]
     df = df[[c for c in cols if c in df.columns]]
     df.to_csv(DATA / "labels_all.csv", index=False)
@@ -49,6 +56,8 @@ def main():
     print(f"  time of day  {df['time'].isin(['day', 'golden hour', 'night']).sum():,}")
     print(f"  palette      {df['palette_colours'].apply(ok).sum():,}")
     print(f"  gradient     {df['gradient_stops'].apply(ok).sum():,}")
+    if "elements" in df:
+        print(f"  details      {df['elements'].apply(ok).sum():,}")
     k = df[df["keep"] == 1]
     print(pd.crosstab([k["source"], k["place"]], k["time"], margins=True))
 

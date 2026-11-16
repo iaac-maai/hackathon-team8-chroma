@@ -74,6 +74,9 @@ main { padding: 16px 20px 40px; }
 .grad { height: 14px; }
 .swatch { display: flex; height: 8px; }
 .swatch span { display: block; height: 100%; }
+.fams { display: flex; height: 6px; margin: 0 10px 6px; border-radius: 3px; overflow: hidden; background: var(--chip); }
+.fams span { display: block; height: 100%; }
+.details { font-size: 11px; color: var(--muted); padding: 0 10px 6px; }
 .music { font-size: 11px; color: var(--muted); padding: 0 10px 8px; }
 .chip.edited { color: var(--ok); outline: 1px solid var(--ok); }
 dialog { border: none; border-radius: 14px; padding: 0; background: var(--panel); color: var(--ink);
@@ -197,8 +200,13 @@ function render() {
         <span class="chip ${ed ? "edited" : lowT ? "low" : ""}">${f.time}${ed ? "" : " " + pct(r.time_conf)}</span>
         <span class="chip ${ed ? "edited" : lowS ? "low" : ""}">${f.season}${ed || f.season === "unknown" ? "" : " " + pct(r.season_conf)}</span>
         ${r.time_true ? `<span class="chip" title="true labels from the photo date">true: ${r.time_true}, ${r.season_true}</span>` : ""}
-      </div>${r.scale ? `<div class="music">${r.scale} · ${r.n_colours} colours · warmth ${r.warmth.toFixed(2)}${r.melody ? " · melody" : ""}</div>` : ""}</div>`;
+      </div>${famBar(r)}${r.top_elements ? `<div class="details">${r.top_elements}<br>${[r.paving_material, r.architecture_style, r.clothing !== "no people" ? r.clothing : ""].filter(Boolean).join(" · ")}</div>` : ""}${r.scale ? `<div class="music">${r.scale} · ${r.n_colours} colours · warmth ${r.warmth.toFixed(2)}${r.melody ? " · melody" : ""}</div>` : ""}</div>`;
   }).join("");
+}
+const FAM = {architecture: "#e4572e", street_furniture: "#f3a712", furniture: "#a8c686", paving: "#8d6a9f", nature: "#2e8b57", sky: "#7fb7e8", people: "#ff4f9a", vehicles: "#5c6b73", goods: "#c9a227"};
+function famBar(r) {
+  if (r.fam_architecture == null) return "";
+  return `<div class="fams" title="share of the image per family">${Object.entries(FAM).map(([k, c]) => r["fam_" + k] > 0.005 ? `<span title="${k.replace("_", " ")} ${Math.round(r["fam_" + k] * 100)}%" style="width:${r["fam_" + k] * 100}%;background:${c}"></span>` : "").join("")}</div>`;
 }
 function grad(r) {
   if (!r.stops) return "";
@@ -225,12 +233,13 @@ function open(i) {
   const r = view[i], f = final(r);
   $("dImg").src = r.file;
   $("dTitle").textContent = f.place + (isEdited(r) ? " · corrected" : "");
-  $("dImg").dataset.photo = r.file; $("dImg").dataset.grad = r.gradient_png || "";
-  $("dImg").title = r.gradient_png ? "Click to switch between the photo and its gradient map" : "";
+  $("dImg").dataset.views = JSON.stringify([r.file, r.gradient_png, r.segmentation_png].filter(Boolean)); $("dImg").dataset.v = "0";
+  $("dImg").title = "Click: photo → gradient map → segmentation";
+  const detailLine = r.top_elements ? ` · elements: ${r.top_elements} · paving: ${r.paving_material} · style: ${r.architecture_style} · facade: ${r.facade_detail} · clothing: ${r.clothing}` : "";
   const musicLine = r.scale ? ` · ${r.scale}, ${r.n_colours} colours, brightness ${r.brightness}, saturation ${r.saturation}, contrast ${r.contrast}, warmth ${r.warmth}` : "";
   $("dSub").textContent = (r.source === "own"
     ? `our photo · taken ${r.taken_at || "date unknown"}` + (r.time_true ? ` · true: ${r.time_true}, ${r.season_true}` : "")
-    : `${r.places365_category} · ${r.file.split("/").pop()}`) + musicLine;
+    : `${r.places365_category} · ${r.file.split("/").pop()}`) + musicLine + detailLine;
   opts($("dPlace"), PLACES, f.place, {}, "place");
   const kl = { "1": "keep (scene)", "0": "remove (close-up)" };
   $("dKeep").innerHTML = ["1", "0"].map(k => `<span class="opt ${k === f.keep ? "on" : ""}" data-k="${k}">${kl[k]}${k === "0" ? `<small>${r.subject}${r.subject_conf != null ? " " + pct(r.subject_conf) : ""}</small>` : ""}</span>`).join("");
@@ -252,7 +261,7 @@ function setLabel(field, value) {
 }
 function renderKeep() { const keep = cur; render(); cur = Math.min(keep, view.length - 1); }
 
-$("dImg").onclick = () => { const i = $("dImg"); if (!i.dataset.grad) return; i.src = i.src.endsWith(i.dataset.grad) ? i.dataset.photo : i.dataset.grad; };
+$("dImg").onclick = () => { const i = $("dImg"), v = JSON.parse(i.dataset.views || "[]"); if (v.length < 2) return; const n = (+i.dataset.v + 1) % v.length; i.dataset.v = n; i.src = v[n]; };
 $("grid").onclick = e => { const t = e.target.closest(".tile"); if (t) open(+t.dataset.i); };
 $("prev").onclick = () => open(cur - 1);
 $("next").onclick = () => open(cur + 1);
@@ -297,6 +306,13 @@ def main():
     gm = DATA / "gradient_maps.csv"
     if gm.exists():
         df = df.merge(pd.read_csv(gm)[["file", "gradient_png", "stops"]], on="file", how="left")
+    # Architectural details, paving, furniture, clothing (detect_details.py).
+    det = DATA / "details.csv"
+    if det.exists():
+        d = pd.read_csv(det)
+        keep_cols = ["file", "top_elements", "segmentation_png", "paving_material", "architecture_style",
+                     "facade_detail", "clothing"] + [c for c in d.columns if c.startswith("fam_")]
+        df = df.merge(d[keep_cols], on="file", how="left")
     # The detector's close-up check (filter_closeups.py) replaces CLIP's subject guess.
     closeups = DATA / "closeups.csv"
     if closeups.exists():
