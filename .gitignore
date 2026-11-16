@@ -1,0 +1,30 @@
+# virtual environments
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# data: downloaded by the notebook, not committed
+data/*
+!data/.gitkeep
+**/data/*
+!**/data/.gitkeep
+
+# model files: on Hugging Face, not on GitHub
+*.onnx
+*.pt
+*.joblib
+
+# Cloudflare and Node
+node_modules/
+.wrangler/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# secrets: NEVER commit these
+.env
+.dev.vars
+kaggle.json
