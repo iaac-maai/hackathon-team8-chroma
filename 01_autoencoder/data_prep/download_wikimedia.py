@@ -12,6 +12,8 @@ Output:
 Run from the 01_autoencoder/ folder:
     python data_prep/download_wikimedia.py            # index + download
     python data_prep/download_wikimedia.py --index    # only build the index
+    python data_prep/download_wikimedia.py --dense    # second, finer pass over the centre
+                                                       # (the API returns max 500 per point)
 """
 
 import re
@@ -52,18 +54,22 @@ def api(params):
     return {}
 
 
-def grid():
-    dlat = STEP_KM / 111.0
-    dlon = STEP_KM / (111.0 * np.cos(np.radians(41.4)))
-    return [(la, lo) for la in np.arange(LAT0, LAT1, dlat) for lo in np.arange(LON0, LON1, dlon)]
+def grid(lat0=LAT0, lat1=LAT1, lon0=LON0, lon1=LON1, step_km=STEP_KM):
+    dlat = step_km / 111.0
+    dlon = step_km / (111.0 * np.cos(np.radians(41.4)))
+    return [(la, lo) for la in np.arange(lat0, lat1, dlat) for lo in np.arange(lon0, lon1, dlon)]
 
 
-def search():
+# Dense centre: Ciutat Vella, Eixample, Gracia, Park Guell, Montjuic, Barceloneta.
+DENSE = dict(lat0=41.365, lat1=41.425, lon0=2.135, lon1=2.205, step_km=0.5)
+
+
+def search(pts=None, radius=RADIUS_M):
     pages = {}
-    pts = grid()
+    pts = pts or grid()
     for i, (la, lo) in enumerate(pts, 1):
         res = api({"action": "query", "list": "geosearch", "gscoord": f"{la}|{lo}",
-                   "gsradius": RADIUS_M, "gslimit": 500, "gsnamespace": 6})
+                   "gsradius": radius, "gslimit": 500, "gsnamespace": 6})
         for g in res.get("query", {}).get("geosearch", []):
             if g["title"].lower().endswith((".jpg", ".jpeg")):
                 pages[g["pageid"]] = {"pageid": g["pageid"], "title": g["title"], "lat": g["lat"], "lon": g["lon"]}
@@ -116,7 +122,21 @@ def fetch(row):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    if INDEX.exists():
+    if "--dense" in sys.argv and INDEX.exists():
+        old = pd.read_csv(INDEX)
+        print(f"Dense pass over the centre (index has {len(old):,}) ...")
+        pages = search(grid(**DENSE), radius=400)
+        new = {k: v for k, v in pages.items() if k not in set(old["pageid"])}
+        print(f"{len(new):,} new photos. Reading licences ...")
+        details(new)
+        add = pd.DataFrame(new.values())
+        if len(add):
+            add = add[add["licence"].fillna("").str.match(OPEN) & (add["thumb"].fillna("") != "")]
+            add["file"] = "wikimedia/" + add["pageid"].astype(str) + ".jpg"
+        df = pd.concat([old, add], ignore_index=True)
+        df.to_csv(INDEX, index=False)
+        print(f"Index now {len(df):,} photos")
+    elif INDEX.exists():
         df = pd.read_csv(INDEX)
         print(f"Index exists: {len(df):,} photos")
     else:

@@ -91,6 +91,7 @@ dialog::backdrop { background: rgb(0 0 0 / .55); }
 .opt small { opacity: .75; margin-left: 4px; }
 .nav { display: flex; gap: 8px; justify-content: space-between; margin-top: 18px; }
 .hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+@media (max-height: 700px) { header { position: static; } }
 @media (max-width: 600px) { .dlg { grid-template-columns: 1fr; } .grid { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>

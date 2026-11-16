@@ -3,7 +3,7 @@
 We want photos of PLACES. People are allowed in a place (a crowded market, a
 hiker on a mountain), but not as the subject (a portrait, a selfie, a dog).
 
-A ready-made object detector (Faster R-CNN, MobileNet v3, trained on COCO)
+A ready-made object detector (Faster R-CNN, MobileNet v3, 320 px input, trained on COCO)
 draws a box around every person, animal and object. The rule uses the share of
 the image each box covers:
 
@@ -24,8 +24,10 @@ from pathlib import Path
 import pandas as pd
 import torch
 from PIL import Image
-from torchvision.models.detection import (FasterRCNN_MobileNet_V3_Large_FPN_Weights,
-                                          fasterrcnn_mobilenet_v3_large_fpn)
+from torchvision.models.detection import (FasterRCNN_MobileNet_V3_Large_320_FPN_Weights,
+                                          fasterrcnn_mobilenet_v3_large_320_fpn)
+
+from sources import load_index
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -35,7 +37,7 @@ PERSON_ONE, PERSON_ALL = 0.15, 0.35
 ANIMAL_ONE = 0.15
 OBJECT_ONE = 0.40
 
-WEIGHTS = FasterRCNN_MobileNet_V3_Large_FPN_Weights.DEFAULT
+WEIGHTS = FasterRCNN_MobileNet_V3_Large_320_FPN_Weights.DEFAULT
 NAMES = WEIGHTS.meta["categories"]
 VEHICLES = {"bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat"}
 ANIMALS = {"bird", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe"}
@@ -76,22 +78,19 @@ def check(boxes, labels, scores, area):
 
 
 def main():
-    index = pd.read_csv(DATA / "places_index.csv")
-    own = DATA / "own_index.csv"
-    if own.exists():
-        index = pd.concat([index, pd.read_csv(own, keep_default_na=False)], ignore_index=True)
+    index = load_index()
 
-    model = fasterrcnn_mobilenet_v3_large_fpn(weights=WEIGHTS).eval()
+    model = fasterrcnn_mobilenet_v3_large_320_fpn(weights=WEIGHTS).eval()
     prep = WEIGHTS.transforms()
 
     rows = []
     for i, f in enumerate(index["file"], 1):
         img = Image.open(DATA / f).convert("RGB")
-        with torch.no_grad():
+        with torch.inference_mode():
             det = model([prep(img)])[0]
         rows.append({"file": f, **check(det["boxes"], det["labels"], det["scores"],
                                         img.width * img.height)})
-        if i % 100 == 0:
+        if i % 1000 == 0:
             print(f"{i}/{len(index)}")
 
     out = pd.DataFrame(rows)

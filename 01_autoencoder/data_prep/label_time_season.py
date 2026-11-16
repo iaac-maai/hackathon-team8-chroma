@@ -1,11 +1,11 @@
-"""Add two layers to every photo: time of day and season.
+"""Add layers to every photo: place (with confidence), time of day and season.
 
 Places365 has no such labels, so a ready-made image-text model (CLIP) guesses
 them "zero-shot": it compares each photo with short text descriptions and picks
 the closest one. Every guess keeps its confidence (0-1), so the library can show
 which labels are uncertain and need a human check.
 
-Input:  ../data/places_index.csv  (from prepare_places365.py)
+Input:  every source in sources.py (Places365, own photos, Wikimedia)
 Output: ../data/labels_auto.csv   index columns + time, time_conf, season, season_conf
                                   + one probability column per label
 
@@ -20,11 +20,26 @@ import torch
 from PIL import Image
 from transformers import CLIPModel, CLIPProcessor
 
+from sources import load_index
+
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 MODEL = "openai/clip-vit-base-patch32"
 
 # Several descriptions per label; their scores are averaged (prompt ensembling).
+# Place: our six places, plus "other" for everything else (museums, food, documents ...).
+PLACE = {
+    "market": ["a photo of a food market with stalls", "a busy market hall with fruit and vegetables"],
+    "street": ["a photo of a city street with buildings", "a narrow old town street", "a wide avenue with traffic"],
+    "beach": ["a photo of a beach and the sea", "a sandy beach with people and waves"],
+    "mountains": ["a view over a city from a hill", "a photo of hills and mountains", "a forest path on a hill"],
+    "metro": ["a photo of a metro station platform", "an underground train station"],
+    "airport": ["a photo of an airport terminal", "an airport hall with check-in desks"],
+    "other": ["a photo of a museum interior", "a photo of a painting or artwork", "a photo of food on a plate",
+              "a scanned document or map", "a close-up of a building detail or sculpture", "a photo of a church interior"],
+}
+INDOOR_PLACES = {"metro", "airport"}
+
 TIME = {
     "day": [
         "a photo taken in bright daylight",
@@ -110,17 +125,15 @@ def text_features(model, processor, label_prompts):
 
 
 def main():
-    index = pd.read_csv(DATA / "places_index.csv").assign(source="places365")
-    own = DATA / "own_index.csv"
-    if own.exists():  # our photos: they also carry the true labels from EXIF
-        index = pd.concat([index, pd.read_csv(own, keep_default_na=False).assign(source="own")],
-                          ignore_index=True)
+    index = load_index()
+    print(index["source"].value_counts().to_string())
     model = CLIPModel.from_pretrained(MODEL).eval()
     processor = CLIPProcessor.from_pretrained(MODEL)
 
     t_feats = text_features(model, processor, TIME)
     s_feats = text_features(model, processor, SEASON)
     c_feats = text_features(model, processor, SUBJECT)
+    p_feats = text_features(model, processor, PLACE)
     scale = model.logit_scale.exp()
 
     rows = []
@@ -128,16 +141,24 @@ def main():
     for start in range(0, len(index), batch):
         part = index.iloc[start:start + batch]
         images = [Image.open(DATA / f).convert("RGB") for f in part["file"]]
+        if start % 1600 == 0:
+            print(f"{start:,}/{len(index):,}", flush=True)
         inputs = processor(images=images, return_tensors="pt")
-        with torch.no_grad():
+        with torch.inference_mode():
             img = as_tensor(model.get_image_features(**inputs))
         img = img / img.norm(dim=-1, keepdim=True)
         p_time = (scale * img @ t_feats.T).softmax(dim=-1)
         p_season = (scale * img @ s_feats.T).softmax(dim=-1)
         p_subject = (scale * img @ c_feats.T).softmax(dim=-1)
+        p_place = (scale * img @ p_feats.T).softmax(dim=-1)
 
-        for (_, r), pt, ps, pc in zip(part.iterrows(), p_time, p_season, p_subject):
+        for (_, r), pt, ps, pc, pp in zip(part.iterrows(), p_time, p_season, p_subject, p_place):
             row = r.to_dict()
+            pi = int(pp.argmax())
+            row["place_clip"], row["place_conf"] = list(PLACE)[pi], round(float(pp[pi]), 3)
+            if not row.get("place"):                      # Wikimedia: no place label of its own
+                row["place"] = row["place_clip"]
+                row["indoor"] = int(row["place"] in INDOOR_PLACES)
             ci = int(pc.argmax())
             row["subject"] = list(SUBJECT)[ci]
             row["subject_conf"] = round(float(pc[ci]), 3)
@@ -156,7 +177,6 @@ def main():
             for k, p in zip(SEASON, ps):
                 row[f"p_season_{k}"] = round(float(p), 3)
             rows.append(row)
-        print(f"{min(start + batch, len(index))}/{len(index)}")
 
     out = pd.DataFrame(rows)
     out.to_csv(DATA / "labels_auto.csv", index=False)

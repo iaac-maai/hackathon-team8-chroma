@@ -31,6 +31,8 @@ import pandas as pd
 from PIL import Image
 from skimage.color import lab2rgb, rgb2lab
 
+from sources import load_index
+
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 OUT = DATA / "gradient_maps"
@@ -69,10 +71,7 @@ def picture(mapped, stops):
 
 
 def main():
-    index = pd.read_csv(DATA / "places_index.csv")
-    own = DATA / "own_index.csv"
-    if own.exists():
-        index = pd.concat([index, pd.read_csv(own, keep_default_na=False)], ignore_index=True)
+    index = load_index()
     OUT.mkdir(exist_ok=True)
 
     rows = []
@@ -86,7 +85,7 @@ def main():
         for k, s in enumerate(stops, 1):
             row[f"s{k}_L"], row[f"s{k}_a"], row[f"s{k}_b"] = (round(float(v), 2) for v in s)
         rows.append(row)
-        if i % 100 == 0:
+        if i % 2000 == 0:
             print(f"{i}/{len(index)}", flush=True)
 
     pd.DataFrame(rows).to_csv(DATA / "gradient_maps.csv", index=False)

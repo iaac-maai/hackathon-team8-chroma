@@ -41,6 +41,8 @@ from PIL import Image
 from skimage.color import lab2rgb, rgb2hsv, rgb2lab
 from sklearn.cluster import KMeans
 
+from sources import load_index
+
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 SIZE = 64
@@ -133,10 +135,7 @@ def music(f, pal):
 
 
 def main():
-    index = pd.read_csv(DATA / "places_index.csv")
-    own = DATA / "own_index.csv"
-    if own.exists():
-        index = pd.concat([index, pd.read_csv(own, keep_default_na=False)], ignore_index=True)
+    index = load_index()
 
     rows = []
     for i, f in enumerate(index["file"], 1):
@@ -146,7 +145,7 @@ def main():
         feat = features(rgb)
         rows.append({"file": f, **feat, "n_colours": len(pal),
                      "palette": json.dumps(pal), **music(feat, pal)})
-        if i % 100 == 0:
+        if i % 2000 == 0:
             print(f"{i}/{len(index)}", flush=True)
 
     out = pd.DataFrame(rows)
