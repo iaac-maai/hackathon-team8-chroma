@@ -71,7 +71,8 @@ main { padding: 16px 20px 40px; }
 .chip { background: var(--chip); border-radius: 999px; padding: 1px 8px; font-size: 12px; white-space: nowrap; }
 .chip.place { font-weight: 600; }
 .chip.low { color: var(--warn); outline: 1px dashed var(--warn); }
-.swatch { display: flex; height: 14px; }
+.grad { height: 14px; }
+.swatch { display: flex; height: 8px; }
 .swatch span { display: block; height: 100%; }
 .music { font-size: 11px; color: var(--muted); padding: 0 10px 8px; }
 .chip.edited { color: var(--ok); outline: 1px solid var(--ok); }
@@ -189,7 +190,7 @@ function render() {
     const lowT = !ed && r.time_conf < .6, lowS = !ed && r.season !== "unknown" && r.season_conf < .6;
     return `<div class="tile" data-i="${i}">
       <img loading="lazy" src="${r.file}" alt="${r.place}">
-      ${swatch(r)}
+      ${grad(r)}${swatch(r)}
       <div class="meta">
         <span class="chip place">${f.place}</span>${r.source === "own" ? '<span class="chip">ours</span>' : ""}${f.keep === "0" ? `<span class="chip low">removed: ${r.subject}</span>` : ""}
         <span class="chip ${ed ? "edited" : lowT ? "low" : ""}">${f.time}${ed ? "" : " " + pct(r.time_conf)}</span>
@@ -197,6 +198,11 @@ function render() {
         ${r.time_true ? `<span class="chip" title="true labels from the photo date">true: ${r.time_true}, ${r.season_true}</span>` : ""}
       </div>${r.scale ? `<div class="music">${r.scale} · ${r.n_colours} colours · warmth ${r.warmth.toFixed(2)}${r.melody ? " · melody" : ""}</div>` : ""}</div>`;
   }).join("");
+}
+function grad(r) {
+  if (!r.stops) return "";
+  const st = JSON.parse(r.stops);
+  return `<div class="grad" title="gradient map: shadows to highlights" style="background:linear-gradient(90deg,${st.map((c, i) => `${c.hex} ${Math.round(i / (st.length - 1) * 100)}%`).join(",")})"></div>`;
 }
 function swatch(r) {
   if (!r.palette) return "";
@@ -218,7 +224,8 @@ function open(i) {
   const r = view[i], f = final(r);
   $("dImg").src = r.file;
   $("dTitle").textContent = f.place + (isEdited(r) ? " · corrected" : "");
-  $("dImg").title = "";
+  $("dImg").dataset.photo = r.file; $("dImg").dataset.grad = r.gradient_png || "";
+  $("dImg").title = r.gradient_png ? "Click to switch between the photo and its gradient map" : "";
   const musicLine = r.scale ? ` · ${r.scale}, ${r.n_colours} colours, brightness ${r.brightness}, saturation ${r.saturation}, contrast ${r.contrast}, warmth ${r.warmth}` : "";
   $("dSub").textContent = (r.source === "own"
     ? `our photo · taken ${r.taken_at || "date unknown"}` + (r.time_true ? ` · true: ${r.time_true}, ${r.season_true}` : "")
@@ -244,6 +251,7 @@ function setLabel(field, value) {
 }
 function renderKeep() { const keep = cur; render(); cur = Math.min(keep, view.length - 1); }
 
+$("dImg").onclick = () => { const i = $("dImg"); if (!i.dataset.grad) return; i.src = i.src.endsWith(i.dataset.grad) ? i.dataset.photo : i.dataset.grad; };
 $("grid").onclick = e => { const t = e.target.closest(".tile"); if (t) open(+t.dataset.i); };
 $("prev").onclick = () => open(cur - 1);
 $("next").onclick = () => open(cur + 1);
@@ -284,6 +292,10 @@ def main():
     pal = DATA / "palette.csv"
     if pal.exists():
         df = df.merge(pd.read_csv(pal), on="file", how="left")
+    # Gradient maps (extract_gradient.py).
+    gm = DATA / "gradient_maps.csv"
+    if gm.exists():
+        df = df.merge(pd.read_csv(gm)[["file", "gradient_png", "stops"]], on="file", how="left")
     # The detector's close-up check (filter_closeups.py) replaces CLIP's subject guess.
     closeups = DATA / "closeups.csv"
     if closeups.exists():
