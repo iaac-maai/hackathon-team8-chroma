@@ -39,6 +39,8 @@ SEG_MODEL = "nvidia/segformer-b0-finetuned-ade-512-512"
 CLIP_MODEL = "openai/clip-vit-base-patch32"
 SIZE = 256
 MIN_SHARE = 0.005        # elements under 0.5 % of the image are ignored
+MIN_ARCH = 0.15          # describe style and facade only if buildings cover >= 15 %
+MIN_GROUND = 0.05        # describe the paving only if the ground covers >= 5 %
 
 # ADE20K classes -> families. Colours are for the overlay.
 FAMILIES = {
@@ -80,7 +82,6 @@ CLIP_GROUPS = {
         "mid-century blocks": ["plain 1960s concrete apartment blocks"],
         "contemporary glass": ["a contemporary glass and steel building"],
         "industrial brick": ["an old industrial brick building with a chimney"],
-        "no buildings": ["a landscape with no buildings"],
     },
     "facade_detail": {
         "iron balconies": ["balconies with wrought iron railings"],
@@ -150,8 +151,14 @@ def main():
                 p = probs[g][b]
                 k = int(p.argmax())
                 row[g], row[f"{g}_conf"] = list(labels_g)[k], round(float(p[k]), 3)
+            # Only describe what is actually in the photo (CLIP always picks something).
             if row["fam_people"] < 0.01:
                 row["clothing"], row["clothing_conf"] = "no people", 0.0
+            if row["fam_architecture"] < MIN_ARCH:
+                for g in ("architecture_style", "facade_detail"):
+                    row[g], row[f"{g}_conf"] = "no buildings visible", 0.0
+            if row["fam_paving"] + row["fam_nature"] * 0.5 < MIN_GROUND:
+                row["paving_material"], row["paving_material_conf"] = "ground not visible", 0.0
             # overlay: photo at 45 %, family colours at 55 % where a family was found
             photo = np.asarray(img, dtype=np.float32)
             colour = lut[lab]
