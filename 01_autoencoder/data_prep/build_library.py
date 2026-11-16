@@ -95,6 +95,7 @@ dialog::backdrop { background: rgb(0 0 0 / .55); }
   <h1>Chroma photo library</h1>
   <div class="sub">Places365 and our own Barcelona photos · time of day and season guessed by CLIP · our photos also carry the true labels from their date. Click a photo to correct it.</div>
   <div class="bar">
+    <select id="fKeep"><option value="1">Scenes kept</option><option value="0">Removed (close-ups)</option><option value="">Kept and removed</option></select>
     <select id="fSource"><option value="">All sources</option><option value="places365">Places365</option><option value="own">Our photos</option></select>
     <select id="fPlace"><option value="">All places</option></select>
     <select id="fTime"><option value="">Any time</option></select>
@@ -117,6 +118,7 @@ dialog::backdrop { background: rgb(0 0 0 / .55); }
     <div class="form">
       <h2 id="dTitle"></h2>
       <div class="sub" id="dSub"></div>
+      <div class="group"><b>Use this photo?</b><div class="opts" id="dKeep"></div></div>
       <div class="group"><b>Place</b><div class="opts" id="dPlace"></div></div>
       <div class="group"><b>Time of day</b><div class="opts" id="dTime"></div></div>
       <div class="group"><b>Season</b><div class="opts" id="dSeason"></div></div>
@@ -125,7 +127,7 @@ dialog::backdrop { background: rgb(0 0 0 / .55); }
         <button id="close">Close</button>
         <button id="next">Next →</button>
       </div>
-      <div class="hint">Keys: 1–3 time · Q W E R T season · ← → move · Esc close. Percentages are the model's confidence.</div>
+      <div class="hint">Keys: X keep/remove · 1–3 time · Q W E R T season · ← → move · Esc close. Percentages are the model's confidence.</div>
     </div>
   </div>
 </dialog>
@@ -137,7 +139,7 @@ let edits = {};
 try { edits = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { edits = {}; }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(edits)); } catch (e) {} };
 
-const final = r => ({ place: edits[r.file]?.place ?? r.place, time: edits[r.file]?.time ?? r.time, season: edits[r.file]?.season ?? r.season });
+const final = r => ({ keep: edits[r.file]?.keep ?? String(r.keep), place: edits[r.file]?.place ?? r.place, time: edits[r.file]?.time ?? r.time, season: edits[r.file]?.season ?? r.season });
 const isEdited = r => !!edits[r.file];
 const pct = x => Math.round(x * 100) + "%";
 const $ = id => document.getElementById(id);
@@ -148,9 +150,10 @@ for (const [id, list] of [["fPlace", PLACES], ["fTime", TIMES], ["fSeason", SEAS
 let view = [], cur = -1;
 
 function filtered() {
-  const src = $("fSource").value, p = $("fPlace").value, t = $("fTime").value, s = $("fSeason").value;
+  const kp = $("fKeep").value, src = $("fSource").value, p = $("fPlace").value, t = $("fTime").value, s = $("fSeason").value;
   return DATA.filter(r => {
     const f = final(r);
+    if (kp && f.keep !== kp) return false;
     if (src && r.source !== src) return false;
     if (p && f.place !== p) return false;
     if (t && f.time !== t) return false;
@@ -184,7 +187,7 @@ function render() {
     return `<div class="tile" data-i="${i}">
       <img loading="lazy" src="${r.file}" alt="${r.place}">
       <div class="meta">
-        <span class="chip place">${f.place}</span>${r.source === "own" ? '<span class="chip">ours</span>' : ""}
+        <span class="chip place">${f.place}</span>${r.source === "own" ? '<span class="chip">ours</span>' : ""}${f.keep === "0" ? `<span class="chip low">removed: ${r.subject}</span>` : ""}
         <span class="chip ${ed ? "edited" : lowT ? "low" : ""}">${f.time}${ed ? "" : " " + pct(r.time_conf)}</span>
         <span class="chip ${ed ? "edited" : lowS ? "low" : ""}">${f.season}${ed || f.season === "unknown" ? "" : " " + pct(r.season_conf)}</span>
         ${r.time_true ? `<span class="chip" title="true labels from the photo date">true: ${r.time_true}, ${r.season_true}</span>` : ""}
@@ -210,6 +213,9 @@ function open(i) {
     ? `our photo · taken ${r.taken_at || "date unknown"}` + (r.time_true ? ` · true: ${r.time_true}, ${r.season_true}` : "")
     : `${r.places365_category} · ${r.file.split("/").pop()}`;
   opts($("dPlace"), PLACES, f.place, {}, "place");
+  const kl = { "1": "keep (scene)", "0": "remove (close-up)" };
+  $("dKeep").innerHTML = ["1", "0"].map(k => `<span class="opt ${k === f.keep ? "on" : ""}" data-k="${k}">${kl[k]}${k === "0" ? `<small>${r.subject}${r.subject_conf != null ? " " + pct(r.subject_conf) : ""}</small>` : ""}</span>`).join("");
+  $("dKeep").querySelectorAll(".opt").forEach(o => o.onclick = () => setLabel("keep", o.dataset.k));
   const pt = Object.fromEntries(TIMES.map(k => [k, r["p_time_" + k.replace(" ", "_")]]));
   const ps = Object.fromEntries(SEASONS.map(k => [k, r["p_season_" + k]]));
   opts($("dTime"), TIMES, f.time, pt, "time");
@@ -220,8 +226,8 @@ function open(i) {
 function setLabel(field, value) {
   const r = view[cur];
   const e = { ...(edits[r.file] || {}), [field]: value };
-  const n = { place: e.place ?? r.place, time: e.time ?? r.time, season: e.season ?? r.season };
-  if (n.place === r.place && n.time === r.time && n.season === r.season) delete edits[r.file];
+  const n = { keep: e.keep ?? String(r.keep), place: e.place ?? r.place, time: e.time ?? r.time, season: e.season ?? r.season };
+  if (n.keep === String(r.keep) && n.place === r.place && n.time === r.time && n.season === r.season) delete edits[r.file];
   else edits[r.file] = n;
   save(); open(cur); renderKeep();
 }
@@ -236,15 +242,16 @@ document.addEventListener("keydown", e => {
   if (e.key === "ArrowLeft") open(cur - 1);
   else if (e.key === "ArrowRight") open(cur + 1);
   else if ("123".includes(e.key) && e.key) setLabel("time", TIMES[+e.key - 1]);
+  else if (e.key.toLowerCase() === "x") setLabel("keep", final(view[cur]).keep === "1" ? "0" : "1");
   else { const j = "qwert".indexOf(e.key.toLowerCase()); if (j >= 0 && e.key.length === 1) setLabel("season", SEASONS[j]); }
 });
-["fSource", "fPlace", "fTime", "fSeason", "fLow", "fEdited"].forEach(id => $(id).onchange = render);
+["fKeep", "fSource", "fPlace", "fTime", "fSeason", "fLow", "fEdited"].forEach(id => $(id).onchange = render);
 $("reset").onclick = () => { if (confirm("Remove all your corrections?")) { edits = {}; save(); render(); } };
 $("export").onclick = () => {
-  const cols = ["file", "source", "place", "places365_category", "indoor", "time", "season", "time_auto", "time_conf", "season_auto", "season_conf", "time_true", "season_true", "taken_at", "reviewed"];
+  const cols = ["file", "source", "keep", "subject", "place", "places365_category", "indoor", "time", "season", "time_auto", "time_conf", "season_auto", "season_conf", "time_true", "season_true", "taken_at", "reviewed"];
   const lines = [cols.join(",")].concat(DATA.map(r => {
     const f = final(r);
-    return [r.file, r.source, f.place, r.places365_category, r.indoor, f.time, f.season, r.time, r.time_conf, r.season, r.season_conf, r.time_true ?? "", r.season_true ?? "", r.taken_at ?? "", isEdited(r) ? 1 : 0]
+    return [r.file, r.source, f.keep, r.subject, f.place, r.places365_category, r.indoor, f.time, f.season, r.time, r.time_conf, r.season, r.season_conf, r.time_true ?? "", r.season_true ?? "", r.taken_at ?? "", isEdited(r) ? 1 : 0]
       .map(v => /[",]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v).join(",");
   }));
   const a = document.createElement("a");
@@ -262,6 +269,14 @@ def main():
     df = pd.read_csv(DATA / "labels_auto.csv")
     if "source" not in df:
         df["source"] = "places365"
+    # The detector's close-up check (filter_closeups.py) replaces CLIP's subject guess.
+    closeups = DATA / "closeups.csv"
+    if closeups.exists():
+        c = pd.read_csv(closeups, keep_default_na=False)[["file", "keep", "reason"]]
+        df = df.drop(columns=["keep"], errors="ignore").merge(c, on="file", how="left")
+        df["keep"] = df["keep"].fillna(1).astype(int)
+        df["subject"] = df["reason"].fillna("")
+        df["subject_conf"] = None
     records = json.loads(df.to_json(orient="records"))
     html = (TEMPLATE
             .replace("__DATA__", json.dumps(records))

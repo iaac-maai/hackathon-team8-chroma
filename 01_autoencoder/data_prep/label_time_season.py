@@ -62,6 +62,35 @@ SEASON = {
 }
 
 
+# Is the PLACE the subject, or a person, animal or object in front of it?
+# Only "scene" photos are kept: close-ups do not show what a place looks like.
+SUBJECT = {
+    "scene": [
+        "a wide photo of a city street with buildings",
+        "a view over a city and its neighbourhoods",
+        "a wide view of a public square or market",
+        "a wide view of a beach and the sea",
+        "a landscape photo of hills and mountains",
+        "the inside of a large station or terminal hall",
+    ],
+    "person": [
+        "a portrait photo of a person",
+        "a close-up photo of a person posing for the camera",
+        "a photo of a child",
+        "a selfie",
+    ],
+    "animal": [
+        "a close-up photo of a dog",
+        "a close-up photo of an animal",
+    ],
+    "object": [
+        "a close-up photo of an object",
+        "a product photo of a single thing",
+        "a close-up photo of a chair",
+    ],
+}
+
+
 def as_tensor(out):
     """transformers 5 returns an output object; older versions return the tensor."""
     return out if isinstance(out, torch.Tensor) else out.pooler_output
@@ -91,6 +120,7 @@ def main():
 
     t_feats = text_features(model, processor, TIME)
     s_feats = text_features(model, processor, SEASON)
+    c_feats = text_features(model, processor, SUBJECT)
     scale = model.logit_scale.exp()
 
     rows = []
@@ -104,9 +134,14 @@ def main():
         img = img / img.norm(dim=-1, keepdim=True)
         p_time = (scale * img @ t_feats.T).softmax(dim=-1)
         p_season = (scale * img @ s_feats.T).softmax(dim=-1)
+        p_subject = (scale * img @ c_feats.T).softmax(dim=-1)
 
-        for (_, r), pt, ps in zip(part.iterrows(), p_time, p_season):
+        for (_, r), pt, ps, pc in zip(part.iterrows(), p_time, p_season, p_subject):
             row = r.to_dict()
+            ci = int(pc.argmax())
+            row["subject"] = list(SUBJECT)[ci]
+            row["subject_conf"] = round(float(pc[ci]), 3)
+            row["keep"] = int(row["subject"] == "scene")
             ti, si = int(pt.argmax()), int(ps.argmax())
             row["time"] = list(TIME)[ti]
             row["time_conf"] = round(float(pt[ti]), 3)
@@ -126,6 +161,8 @@ def main():
     out = pd.DataFrame(rows)
     out.to_csv(DATA / "labels_auto.csv", index=False)
     print(f"\nWrote {DATA / 'labels_auto.csv'}")
+    print(pd.crosstab(out["place"], out["subject"]))
+    print(f"Kept {out['keep'].sum()} of {len(out)} photos as scenes.\n")
     print(pd.crosstab(out["place"], out["time"]))
     print(pd.crosstab(out["place"], out["season"]))
 
