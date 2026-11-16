@@ -71,6 +71,9 @@ main { padding: 16px 20px 40px; }
 .chip { background: var(--chip); border-radius: 999px; padding: 1px 8px; font-size: 12px; white-space: nowrap; }
 .chip.place { font-weight: 600; }
 .chip.low { color: var(--warn); outline: 1px dashed var(--warn); }
+.swatch { display: flex; height: 14px; }
+.swatch span { display: block; height: 100%; }
+.music { font-size: 11px; color: var(--muted); padding: 0 10px 8px; }
 .chip.edited { color: var(--ok); outline: 1px solid var(--ok); }
 dialog { border: none; border-radius: 14px; padding: 0; background: var(--panel); color: var(--ink);
          width: min(760px, 94vw); }
@@ -186,13 +189,19 @@ function render() {
     const lowT = !ed && r.time_conf < .6, lowS = !ed && r.season !== "unknown" && r.season_conf < .6;
     return `<div class="tile" data-i="${i}">
       <img loading="lazy" src="${r.file}" alt="${r.place}">
+      ${swatch(r)}
       <div class="meta">
         <span class="chip place">${f.place}</span>${r.source === "own" ? '<span class="chip">ours</span>' : ""}${f.keep === "0" ? `<span class="chip low">removed: ${r.subject}</span>` : ""}
         <span class="chip ${ed ? "edited" : lowT ? "low" : ""}">${f.time}${ed ? "" : " " + pct(r.time_conf)}</span>
         <span class="chip ${ed ? "edited" : lowS ? "low" : ""}">${f.season}${ed || f.season === "unknown" ? "" : " " + pct(r.season_conf)}</span>
         ${r.time_true ? `<span class="chip" title="true labels from the photo date">true: ${r.time_true}, ${r.season_true}</span>` : ""}
-      </div></div>`;
+      </div>${r.scale ? `<div class="music">${r.scale} · ${r.n_colours} colours · warmth ${r.warmth.toFixed(2)}${r.melody ? " · melody" : ""}</div>` : ""}</div>`;
   }).join("");
+}
+function swatch(r) {
+  if (!r.palette) return "";
+  const p = JSON.parse(r.palette).sort((a, b) => a.height - b.height);
+  return `<div class="swatch">${p.map(c => `<span title="${c.hex} · ${Math.round(c.weight * 100)}%" style="width:${c.weight * 100}%;background:${c.hex}"></span>`).join("")}</div>`;
 }
 
 function opts(el, keys, chosen, probs, field) {
@@ -209,9 +218,11 @@ function open(i) {
   const r = view[i], f = final(r);
   $("dImg").src = r.file;
   $("dTitle").textContent = f.place + (isEdited(r) ? " · corrected" : "");
-  $("dSub").textContent = r.source === "own"
+  $("dImg").title = "";
+  const musicLine = r.scale ? ` · ${r.scale}, ${r.n_colours} colours, brightness ${r.brightness}, saturation ${r.saturation}, contrast ${r.contrast}, warmth ${r.warmth}` : "";
+  $("dSub").textContent = (r.source === "own"
     ? `our photo · taken ${r.taken_at || "date unknown"}` + (r.time_true ? ` · true: ${r.time_true}, ${r.season_true}` : "")
-    : `${r.places365_category} · ${r.file.split("/").pop()}`;
+    : `${r.places365_category} · ${r.file.split("/").pop()}`) + musicLine;
   opts($("dPlace"), PLACES, f.place, {}, "place");
   const kl = { "1": "keep (scene)", "0": "remove (close-up)" };
   $("dKeep").innerHTML = ["1", "0"].map(k => `<span class="opt ${k === f.keep ? "on" : ""}" data-k="${k}">${kl[k]}${k === "0" ? `<small>${r.subject}${r.subject_conf != null ? " " + pct(r.subject_conf) : ""}</small>` : ""}</span>`).join("");
@@ -269,6 +280,10 @@ def main():
     df = pd.read_csv(DATA / "labels_auto.csv")
     if "source" not in df:
         df["source"] = "places365"
+    # Colour parameters and music labels (extract_palette.py).
+    pal = DATA / "palette.csv"
+    if pal.exists():
+        df = df.merge(pd.read_csv(pal), on="file", how="left")
     # The detector's close-up check (filter_closeups.py) replaces CLIP's subject guess.
     closeups = DATA / "closeups.csv"
     if closeups.exists():
