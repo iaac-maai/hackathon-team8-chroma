@@ -1,0 +1,15 @@
+{
+  "architecture": "B \u00b7 conv-64",
+  "latent_dim": 64,
+  "image_size": 64,
+  "preprocessing": "RGB, resized to 64x64 (bilinear), pixels scaled to 0-1, shape (N, 3, 64, 64)",
+  "outputs": {
+    "reconstruction": "(N, 3, 64, 64)",
+    "latent": "(N, latent_dim), L2-normalised"
+  },
+  "use": "similarity search: cosine similarity between the latent of a photo and library_latent.npy",
+  "library": "library.csv (labels, colours and music parameters of 731 Places365 scenes)",
+  "place_precision_at_5": 0.352,
+  "chance_precision": 0.218,
+  "seed": 8
+}

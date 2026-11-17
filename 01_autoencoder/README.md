@@ -11,8 +11,7 @@ It works on a photo of **any city**. The model learns from 36,500 photos of plac
 world. **Barcelona** is our home city: the demo photos, our own photos and the Wikimedia set are from here.
 
 > Status (Tuesday): data, labels, gradient maps, detail recognition, the library and the autoencoder
-> comparison are done. The notebook is being rerun after a fix in the ONNX check (the export left the
-> model in training mode); its figures and the Hugging Face model follow when it finishes.
+> (three setups, ONNX checked) are done. Next: Hugging Face model card, Barcelona photos (Wikimedia) in the library.
 
 ---
 
@@ -147,11 +146,11 @@ Split first: 80 % train, 10 % validation, 10 % test, seed 8. All three setups us
 |---|---|---|---|---|---|---|---|
 | A · dense-64 | flatten → 512 → 64 | 64 | 12.7 M | 6 min | 0.0195 | 0.0193 | 0.319 |
 | **B · conv-64** ⭐ | 4 conv layers, stride 2 | 64 | **1.9 M** | 20 min | 0.0129 | 0.0127 | **0.352** |
-| C · conv-256 | same | 256 | 3.5 M | ≈ 30 min* | **0.0079** | **0.0078** | 0.349 |
+| C · conv-256 | same | 256 | 3.5 M | 22 min | **0.0079** | **0.0078** | 0.349 |
 
 Place precision@5: of the 5 most similar scenes, the share with the same place as the query
 (79 test photos of our six places). **Chance = 0.218.** 12 epochs, Adam 1e-3, batch 128, laptop CPU.
-*The first run of C was paused overnight by the laptop sleeping (1,131 min wall time); its compute was about 30 min.*
+
 
 **What we conclude.**
 - **Convolutions win.** With 7 × fewer parameters than the dense model, conv-64 reconstructs a third
@@ -167,14 +166,25 @@ Place precision@5: of the 5 most similar scenes, the share with the same place a
   light, colour and layout (a bright beach finds bright snowy mountains). That is useful for the music,
   which is driven by light and colour; for the place itself the app uses CLIP.
 
+![Loss curves](figures/02_loss_curves.png)
+![Reconstructions](figures/03_reconstructions.png)
+
 **The use: similarity search.** Every scene of the library gets its latent vector. For a new photo
 the app returns the closest scenes (cosine similarity) with their place, time, season and colours.
 **Proof:** for the test photos of our six places we measure how often the 5 nearest scenes are the
 same place, and compare with chance. The autoencoder never sees a place label, so any gain over
 chance comes from what it learned about how places look.
 
+![Similarity search](figures/04_similarity.png)
+
+The latent map shows what the code captures: **light and setting**. Bright outdoor scenes (beach,
+mountains, day) on top, indoor and night scenes (metro, airport, market, warm light) at the bottom,
+warmth changing smoothly across it.
+
+![Latent map](figures/05_latent_map.png)
+
 **For the server:** the ONNX model takes `(N, 3, 64, 64)` and returns the reconstruction and the
-normalised latent vector. `model_app/` holds the ONNX file, `chroma_ae_config.json` and the library
+normalised latent vector (ONNX = PyTorch, max difference 7 × 10⁻⁷). `model_app/` holds the ONNX file, `chroma_ae_config.json` and the library
 (latent vectors and labels, no photos). The notebook checks that ONNX gives the same numbers as PyTorch.
 
 Hugging Face: `iaac-maai/hackathon-team8-chroma-ae` (after the run).
