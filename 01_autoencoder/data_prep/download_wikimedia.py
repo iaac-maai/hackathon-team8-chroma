@@ -30,6 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 OUT = DATA / "wikimedia"
 INDEX = DATA / "wikimedia_index.csv"
+FOUND = DATA / "wikimedia_found.csv"        # checkpoint: search results + licences read so far
 API = "https://commons.wikimedia.org/w/api.php"
 HEADERS = {"User-Agent": "course-project-client/0.1 (educational, non-commercial)"}
 # Barcelona municipality, roughly
@@ -83,7 +84,8 @@ def strip_html(s):
 
 
 def details(pages):
-    ids = list(pages)
+    ids = [k for k, v in pages.items() if "thumb" not in v]      # skip what a previous run already read
+    print(f"  {len(pages) - len(ids):,} already read, {len(ids):,} to go", flush=True)
     for i in range(0, len(ids), 50):
         res = api({"action": "query", "pageids": "|".join(map(str, ids[i:i + 50])),
                    "prop": "imageinfo", "iiprop": "url|extmetadata", "iiurlwidth": 256,
@@ -101,6 +103,8 @@ def details(pages):
             row["url"] = info.get("descriptionurl", "")
         if (i // 50) % 40 == 0:
             print(f"  details {i:,}/{len(ids):,}", flush=True)
+            pd.DataFrame(pages.values()).to_csv(FOUND, index=False)   # checkpoint
+    pd.DataFrame(pages.values()).to_csv(FOUND, index=False)
 
 
 def fetch(row):
@@ -140,8 +144,14 @@ def main():
         df = pd.read_csv(INDEX)
         print(f"Index exists: {len(df):,} photos")
     else:
-        print("Searching Barcelona on a grid ...")
-        pages = search()
+        if FOUND.exists():
+            f = pd.read_csv(FOUND)
+            pages = {int(r["pageid"]): {k: v for k, v in r.items() if pd.notna(v)} for r in f.to_dict("records")}
+            print(f"Resuming from {FOUND.name}: {len(pages):,} photos found earlier")
+        else:
+            print("Searching Barcelona on a grid ...")
+            pages = search()
+            pd.DataFrame(pages.values()).to_csv(FOUND, index=False)
         print(f"{len(pages):,} geotagged photos. Reading licences ...")
         details(pages)
         df = pd.DataFrame(pages.values())
