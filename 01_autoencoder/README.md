@@ -10,8 +10,9 @@ measured and compressed by an autoencoder, so that the app can send the music a
 It works on a photo of **any city**. The model learns from 36,500 photos of places from all over the
 world. **Barcelona** is our home city: the demo photos, our own photos and the Wikimedia set are from here.
 
-> Status (Monday evening): data, labels, gradient maps, detail recognition and the library are done.
-> The autoencoder notebook is training; its results table and figures are added when the run finishes.
+> Status (Tuesday): data, labels, gradient maps, detail recognition, the library and the autoencoder
+> comparison are done. The notebook is being rerun after a fix in the ONNX check (the export left the
+> model in training mode); its figures and the Hugging Face model follow when it finishes.
 
 ---
 
@@ -144,12 +145,27 @@ Split first: 80 % train, 10 % validation, 10 % test, seed 8. All three setups us
 
 | Setup | Encoder | Latent | Parameters | Train time | Val MSE | Test MSE | Place precision@5 |
 |---|---|---|---|---|---|---|---|
-| A · dense-64 | flatten → 512 → 64 | 64 | | | | | |
-| B · conv-64 | 4 conv layers, stride 2 | 64 | | | | | |
-| C · conv-256 | same | 256 | | | | | |
+| A · dense-64 | flatten → 512 → 64 | 64 | 12.7 M | 6 min | 0.0195 | 0.0193 | 0.319 |
+| **B · conv-64** ⭐ | 4 conv layers, stride 2 | 64 | **1.9 M** | 20 min | 0.0129 | 0.0127 | **0.352** |
+| C · conv-256 | same | 256 | 3.5 M | ≈ 30 min* | **0.0079** | **0.0078** | 0.349 |
 
-*Training on the laptop CPU; the numbers, the loss curves, the reconstructions and the conclusion
-are added when the run finishes.*
+Place precision@5: of the 5 most similar scenes, the share with the same place as the query
+(79 test photos of our six places). **Chance = 0.218.** 12 epochs, Adam 1e-3, batch 128, laptop CPU.
+*The first run of C was paused overnight by the laptop sleeping (1,131 min wall time); its compute was about 30 min.*
+
+**What we conclude.**
+- **Convolutions win.** With 7 × fewer parameters than the dense model, conv-64 reconstructs a third
+  better (test MSE 0.0127 vs 0.0193). Convolutions see neighbouring pixels, so they keep horizons,
+  edges and textures; the dense model only keeps blurry colour fields.
+- **A bigger code reconstructs better but does not search better.** conv-256 halves the error again
+  (0.0078), yet its similarity search is not better (0.349 vs 0.352). The extra numbers store detail
+  (textures, small objects) that does not decide what kind of place it is.
+- **We use conv-64**: the best search, the smallest model (7 MB as ONNX, fits Render's free plan), and
+  a 64-number code that is cheap to compare. Its 5 nearest scenes share the query's place 1.6 × more
+  often than chance, although it never saw a place label.
+- **Limit:** 0.35 means most neighbours are still another place. The autoencoder groups photos by
+  light, colour and layout (a bright beach finds bright snowy mountains). That is useful for the music,
+  which is driven by light and colour; for the place itself the app uses CLIP.
 
 **The use: similarity search.** Every scene of the library gets its latent vector. For a new photo
 the app returns the closest scenes (cosine similarity) with their place, time, season and colours.
