@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chroma Gradient Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: one working column. Drop zone first, then one result card per photo (images left, gradient and values right). */
+:root {
+  --bg: #f4f4f6; --panel: #ffffff; --ink: #18181d; --muted: #63636f; --line: #e2e2e8;
+  --accent: #4b4fd6; --chip: #ececf1; --on-accent: #ffffff;
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #131317; --panel: #1c1c22; --ink: #ededf2; --muted: #9a9aa8; --line: #303039;
+    --accent: #9a9dff; --chip: #2a2a33; --on-accent: #131317; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #131317; --panel: #1c1c22; --ink: #ededf2; --muted: #9a9aa8; --line: #303039;
+  --accent: #9a9dff; --chip: #2a2a33; --on-accent: #131317; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
+main { max-width: 1080px; margin: 0 auto; padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font: 600 28px/1.15 var(--display); letter-spacing: -0.02em; margin: 0 0 6px; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 68ch; margin: 0 0 20px; }
+.how { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 0 0 20px; padding: 0; list-style: none; counter-reset: step; }
+.how li { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; color: var(--muted); counter-increment: step; }
+.how li::before { content: counter(step); display: block; font: 600 12px var(--display); color: var(--accent); margin-bottom: 2px; }
+.drop { display: block; border: 2px dashed var(--line); border-radius: 14px; padding: 26px 16px; text-align: center; background: var(--panel); cursor: pointer; transition: border-color .15s; }
+.drop:hover, .drop.over, .drop:focus-within { border-color: var(--accent); }
+.drop strong { display: block; font: 600 17px var(--display); margin-bottom: 2px; }
+.drop span { color: var(--muted); font-size: 13px; }
+.bar-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 12px 0 22px; }
+button { font: 500 13px var(--body); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, .drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.count { color: var(--muted); font-size: 13px; margin-left: auto; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+.card h2 { font: 600 15px var(--display); margin: 0 0 12px; overflow-wrap: anywhere; display: flex; gap: 8px; align-items: baseline; }
+.tag { font: 500 11px var(--body); background: var(--chip); color: var(--muted); border-radius: 999px; padding: 2px 8px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 18px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pair figure { margin: 0; min-width: 0; }
+.pair canvas { width: 100%; max-width: 100%; aspect-ratio: 1; border-radius: 8px; display: block; }
+.pair figcaption { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.label { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 0 0 6px; }
+.gbar { height: 28px; border-radius: 6px; }
+.stops { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; margin-top: 6px; }
+.stops div { font: 400 10px var(--mono); color: var(--muted); text-align: center; overflow: hidden; }
+.stops span { display: block; height: 20px; border-radius: 4px; margin-bottom: 2px; border: 1px solid var(--line); }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 16px; }
+.metric { display: grid; grid-template-columns: 84px 1fr 36px; gap: 8px; align-items: center; margin: 5px 0; font-size: 13px; }
+.track { height: 8px; background: var(--chip); border-radius: 4px; overflow: hidden; }
+.fill { height: 100%; background: var(--accent); }
+.num { text-align: right; font: 400 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
+dt { color: var(--muted); }
+dd { margin: 0; }
+footer { color: var(--muted); font-size: 12px; margin-top: 28px; max-width: 72ch; }
+@media (max-width: 760px) { .layout, .cols { grid-template-columns: 1fr; } .how { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<main>
+  <h1>Chroma gradient maps</h1>
+  <p class="lede">Drop a photo of a place and see its gradient map: the 8 colours it has from the deepest shadows to the brightest highlights, the photo repainted through them, and the music values the team derives from them. Everything runs in your browser; photos are not uploaded.</p>
+  <ol class="how">
+    <li>Sort every pixel from darkest to lightest</li>
+    <li>Cut them into 8 equal groups</li>
+    <li>Average colour of each group = one stop</li>
+    <li>Repaint each pixel with the stop at its lightness</li>
+  </ol>
+  <label class="drop" id="drop">
+    <strong>Drop photos here, or click to choose</strong>
+    <span>JPG or PNG · several at once is fine</span>
+    <input type="file" id="file" accept="image/*" multiple hidden>
+  </label>
+  <div class="bar-row">
+    <button id="sample" type="button">Add the sample scene again</button>
+    <button id="clear" type="button">Clear all</button>
+    <span class="count" id="count"></span>
+  </div>
+  <div id="out"></div>
+  <footer>Team 8 · AI Methods hackathon, IAAC. Same method as <code>data_prep/extract_gradient.py</code> and <code>extract_palette.py</code> in the team repository: photos are centre-cropped and reduced to 128 × 128 px, colours are averaged in CIE Lab. Scale rule: warm and bright → D lydian, bright → D major, dark → D minor, in between → D dorian.</footer>
+</main>
+
+<script>
+const STOPS = 8, SIZE = 128;
+const lin = c => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+const unlin = c => c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+const Xn = 0.95047, Zn = 1.08883;
+const f = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+const fi = t => t > 0.206893 ? t * t * t : (t - 16 / 116) / 7.787;
+function rgb2lab(r, g, b) {
+  r = lin(r); g = lin(g); b = lin(b);
+  const x = (0.412453 * r + 0.357580 * g + 0.180423 * b) / Xn;
+  const y = 0.212671 * r + 0.715160 * g + 0.072169 * b;
+  const z = (0.019334 * r + 0.119193 * g + 0.950227 * b) / Zn;
+  const fy = f(y);
+  return [y > 0.008856 ? 116 * fy - 16 : 903.3 * y, 500 * (f(x) - fy), 200 * (fy - f(z))];
+}
+function lab2rgb(L, a, b) {
+  const fy = (L + 16) / 116, x = fi(fy + a / 500) * Xn, y = fi(fy), z = fi(fy - b / 200) * Zn;
+  return [3.240479 * x - 1.537150 * y - 0.498535 * z, -0.969256 * x + 1.875992 * y + 0.041556 * z,
+          0.055648 * x - 0.204043 * y + 1.057311 * z].map(c => Math.min(1, Math.max(0, unlin(Math.max(0, c)))));
+}
+const hex = rgb => "#" + rgb.map(c => Math.round(c * 255).toString(16).padStart(2, "0")).join("");
+
+function analyse(source, w, h) {
+  const c = document.createElement("canvas"); c.width = c.height = SIZE;
+  const ctx = c.getContext("2d");
+  const s = Math.min(w, h);
+  ctx.drawImage(source, (w - s) / 2, (h - s) / 2, s, s, 0, 0, SIZE, SIZE);
+  const px = ctx.getImageData(0, 0, SIZE, SIZE).data, n = SIZE * SIZE;
+  const lab = new Float64Array(n * 3), sat = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const r = px[4 * i] / 255, g = px[4 * i + 1] / 255, b = px[4 * i + 2] / 255;
+    const L = rgb2lab(r, g, b); lab.set(L, 3 * i);
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b); sat[i] = mx ? (mx - mn) / mx : 0;
+  }
+  const order = Array.from({ length: n }, (_, i) => i).sort((p, q) => lab[3 * p] - lab[3 * q]);
+  const stops = [];
+  for (let k = 0; k < STOPS; k++) {
+    const a = Math.floor(k * n / STOPS), z = Math.floor((k + 1) * n / STOPS); let L = 0, A = 0, B = 0;
+    for (let j = a; j < z; j++) { const i = order[j]; L += lab[3 * i]; A += lab[3 * i + 1]; B += lab[3 * i + 2]; }
+    stops.push([L / (z - a), A / (z - a), B / (z - a)]);
+  }
+  const out = ctx.createImageData(SIZE, SIZE);
+  for (let i = 0; i < n; i++) {
+    const L = lab[3 * i]; let k = 0;
+    while (k < STOPS - 2 && L > stops[k + 1][0]) k++;
+    const t = Math.min(1, Math.max(0, (L - stops[k][0]) / ((stops[k + 1][0] - stops[k][0]) || 1)));
+    const rgb = lab2rgb(...[0, 1, 2].map(d => stops[k][d] + t * (stops[k + 1][d] - stops[k][d])));
+    out.data.set([rgb[0] * 255, rgb[1] * 255, rgb[2] * 255, 255], 4 * i);
+  }
+  let Ls = 0, L2 = 0, S = 0, W = 0, Wt = 0;
+  for (let i = 0; i < n; i++) {
+    const L = lab[3 * i] / 100; Ls += L; L2 += L * L; S += sat[i];
+    const wt = 0.2 + sat[i]; W += (lab[3 * i + 2] + 0.5 * lab[3 * i + 1]) * wt; Wt += wt;
+  }
+  const brightness = Ls / n;
+  return { src: c, out, stops, vals: {
+    brightness, saturation: S / n,
+    contrast: Math.min(Math.sqrt(Math.max(0, L2 / n - brightness ** 2)) / 0.3, 1),
+    warmth: Math.min(1, Math.max(0, 0.5 + (W / Wt) / 60)) } };
+}
+
+function music(v, stops) {
+  const scale = v.brightness >= 0.55 && v.warmth >= 0.6 ? "lydian" : v.brightness >= 0.5 ? "major" : v.brightness < 0.35 ? "minor" : "dorian";
+  return [
+    ["scale", `D ${scale}`],
+    ["melody", v.saturation >= 0.30 ? "yes, colourful scene" : "no, greyish scene"],
+    ["tone", v.brightness >= 0.5 ? "bright and open" : "dark and muffled"],
+    ["drums", `${Math.round(v.contrast * 100)} % hit strength`],
+    ["light range", `${Math.round((stops[STOPS - 1][0] - stops[0][0]))} of 100 (shadow to highlight)`],
+    ["bass colour", hex(lab2rgb(...stops[0]))],
+  ];
+}
+
+const out = document.getElementById("out");
+function updateCount() { const n = out.children.length; document.getElementById("count").textContent = n ? `${n} photo${n > 1 ? "s" : ""}` : ""; }
+
+function render(name, source, w, h, tag) {
+  const r = analyse(source, w, h);
+  const stopHex = r.stops.map(s => hex(lab2rgb(...s)));
+  const card = document.createElement("article"); card.className = "card";
+  const title = document.createElement("h2"); title.textContent = name;
+  if (tag) { const t = document.createElement("span"); t.className = "tag"; t.textContent = tag; title.append(t); }
+  card.append(title);
+  const body = document.createElement("div"); body.className = "layout";
+  body.innerHTML = `
+    <div class="pair">
+      <figure><canvas class="a" aria-label="photo"></canvas><figcaption>photo, centre crop</figcaption></figure>
+      <figure><canvas class="b" aria-label="gradient map"></canvas><figcaption>gradient map</figcaption></figure>
+    </div>
+    <div>
+      <p class="label">Gradient, shadows to highlights</p>
+      <div class="gbar" style="background:linear-gradient(90deg,${stopHex.map((x, i) => `${x} ${Math.round(i / 7 * 100)}%`).join(",")})"></div>
+      <div class="stops">${stopHex.map((x, i) => `<div><span style="background:${x}"></span>${x}</div>`).join("")}</div>
+      <div class="cols">
+        <div><p class="label">Colour values</p>${Object.entries(r.vals).map(([k, v]) =>
+          `<div class="metric"><span>${k}</span><div class="track"><div class="fill" style="width:${Math.round(v * 100)}%"></div></div><span class="num">${v.toFixed(2)}</span></div>`).join("")}</div>
+        <div><p class="label">Music</p><dl>${music(r.vals, r.stops).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl></div>
+      </div>
+    </div>`;
+  card.append(body);
+  const a = body.querySelector(".a"), b = body.querySelector(".b");
+  a.width = a.height = b.width = b.height = SIZE;
+  a.getContext("2d").drawImage(r.src, 0, 0); b.getContext("2d").putImageData(r.out, 0, 0);
+  out.prepend(card); updateCount();
+}
+
+function sampleScene() {
+  const c = document.createElement("canvas"); c.width = c.height = 512; const g = c.getContext("2d");
+  const sky = g.createLinearGradient(0, 0, 0, 300);
+  sky.addColorStop(0, "#2b3a67"); sky.addColorStop(0.55, "#e0795a"); sky.addColorStop(1, "#f6c27a");
+  g.fillStyle = sky; g.fillRect(0, 0, 512, 300);
+  g.fillStyle = "#ffe2a8"; g.beginPath(); g.arc(360, 250, 34, 0, Math.PI * 2); g.fill();
+  const sea = g.createLinearGradient(0, 300, 0, 400);
+  sea.addColorStop(0, "#c46a55"); sea.addColorStop(1, "#2f3f63");
+  g.fillStyle = sea; g.fillRect(0, 300, 512, 100);
+  let x = 0; const roofs = ["#7a3b2e", "#8f4a35", "#5b2f2a", "#a0563c", "#6d3a30"];
+  while (x < 512) { const w = 40 + (x * 37) % 50, h = 90 + (x * 53) % 80;
+    g.fillStyle = roofs[(x / 10 | 0) % roofs.length]; g.fillRect(x, 512 - h, w, h);
+    g.fillStyle = "#f2b866"; for (let y = 512 - h + 14; y < 500; y += 22) for (let wx = x + 8; wx < x + w - 10; wx += 16) g.fillRect(wx, y, 6, 9);
+    x += w + 4; }
+  return c;
+}
+function addSample() { render("Sunset over the sea and rooftops", sampleScene(), 512, 512, "sample"); }
+
+function loadFile(file) {
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => { render(file.name, img, img.naturalWidth, img.naturalHeight); URL.revokeObjectURL(url); };
+  img.onerror = () => URL.revokeObjectURL(url);
+  img.src = url;
+}
+const drop = document.getElementById("drop");
+document.getElementById("file").addEventListener("change", e => { [...e.target.files].forEach(loadFile); e.target.value = ""; });
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over");
+  [...e.dataTransfer.files].filter(x => x.type.startsWith("image/")).forEach(loadFile); });
+document.getElementById("sample").addEventListener("click", addSample);
+document.getElementById("clear").addEventListener("click", () => { out.innerHTML = ""; updateCount(); });
+addSample();
+</script>
+</body>
+</html>
