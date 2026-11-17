@@ -1,14 +1,9 @@
-# Render "Blueprint": creates the Chroma model server from this repository in one step.
+# Render "Blueprint" for the class demo: a static site with the Chroma Gradient Map prototype.
+# The full app (model server + UI) gets added here on Friday.
 services:
   - type: web
-    name: team8-chroma-model
-    runtime: python
-    plan: free
-    region: frankfurt
-    rootDir: 01_autoencoder/model_app
-    buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
-    healthCheckPath: /
-    envVars:
-      - key: PYTHON_VERSION
-        value: "3.12.7"
+    name: chroma
+    runtime: static
+    rootDir: 01_autoencoder/prototype/site
+    buildCommand: echo "static site, no build"
+    staticPublishPath: .
