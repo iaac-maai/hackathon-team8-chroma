@@ -25,6 +25,7 @@ from sources import load_index
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 MODEL = "openai/clip-vit-base-patch32"
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"     # Colab GPU when there is one
 
 # Several descriptions per label; their scores are averaged (prompt ensembling).
 # Place: our six places, plus "other" for everything else (museums, food, documents ...).
@@ -115,7 +116,7 @@ def text_features(model, processor, label_prompts):
     """One normalised text vector per label (mean of its prompts)."""
     feats = []
     for prompts in label_prompts.values():
-        inputs = processor(text=prompts, return_tensors="pt", padding=True)
+        inputs = processor(text=prompts, return_tensors="pt", padding=True).to(DEVICE)
         with torch.no_grad():
             f = as_tensor(model.get_text_features(**inputs))
         f = f / f.norm(dim=-1, keepdim=True)
@@ -127,7 +128,8 @@ def text_features(model, processor, label_prompts):
 def main():
     index = load_index()
     print(index["source"].value_counts().to_string())
-    model = CLIPModel.from_pretrained(MODEL).eval()
+    model = CLIPModel.from_pretrained(MODEL).eval().to(DEVICE)
+    print("device:", DEVICE)
     processor = CLIPProcessor.from_pretrained(MODEL)
 
     t_feats = text_features(model, processor, TIME)
@@ -137,13 +139,13 @@ def main():
     scale = model.logit_scale.exp()
 
     rows = []
-    batch = 32
+    batch = 128 if DEVICE == "cuda" else 32
     for start in range(0, len(index), batch):
         part = index.iloc[start:start + batch]
         images = [Image.open(DATA / f).convert("RGB") for f in part["file"]]
         if start % 1600 == 0:
             print(f"{start:,}/{len(index):,}", flush=True)
-        inputs = processor(images=images, return_tensors="pt")
+        inputs = processor(images=images, return_tensors="pt").to(DEVICE)
         with torch.inference_mode():
             img = as_tensor(model.get_image_features(**inputs))
         img = img / img.norm(dim=-1, keepdim=True)

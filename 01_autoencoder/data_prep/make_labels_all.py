@@ -2,10 +2,12 @@
 
     place, place_conf        Places365 label, own folder, or CLIP's guess (Wikimedia)
     time, season             CLIP's guess with confidence; *_true from the capture date when known
-    keep, reason             close-up filter; Wikimedia photos that CLIP calls "other"
+    keep, reason             close-up filter, then the quality filter (black and white,
+                             sepia, dark, blown out, flat, blurry, border, duplicate); Wikimedia photos that CLIP calls "other"
                              (museum, artwork, food, document ...) are not kept either
     colours                  brightness, saturation, contrast, warmth, n_colours, palette
     gradient map             8 stops dark -> light, and the repainted image
+    gradient layers          8 stops each for the near, mid and far depth thirds
     music                    scale, chords, sevenths, tone, melody, drums
 
 Output: ../data/labels_all.csv
@@ -30,6 +32,18 @@ def main():
     df = (lab.drop(columns=["keep"], errors="ignore")
              .merge(cl, on="file", how="left").merge(pal, on="file", how="left").merge(gm, on="file", how="left")
              .rename(columns={"stops": "gradient_stops", "palette": "palette_colours"}))
+    qual = DATA / "quality.csv"      # second cleaning pass (filter_quality.py)
+    if qual.exists():
+        q = pd.read_csv(qual, keep_default_na=False)[["file", "keep_quality", "reason_quality"]]
+        df = df.merge(q, on="file", how="left")
+        bad = (df["keep_quality"] == 0) & (df["keep"] == 1)
+        df.loc[bad, "keep"] = 0
+        df.loc[bad, "reason"] = df.loc[bad, "reason_quality"]
+        df = df.drop(columns=["keep_quality", "reason_quality"])
+    layers = DATA / "gradient_layers.csv"   # near / mid / far gradients (extract_gradient_layers.py)
+    if layers.exists():
+        df = df.merge(pd.read_csv(layers)[["file", "near_stops", "mid_stops", "far_stops", "gradient_layers_png"]],
+                      on="file", how="left")
     det = DATA / "details.csv"
     if det.exists():
         df = df.merge(pd.read_csv(det), on="file", how="left")
@@ -41,7 +55,8 @@ def main():
             "keep", "reason", "lat", "lon", "taken_at",
             "time", "time_conf", "time_true", "season", "season_conf", "season_true",
             "brightness", "saturation", "contrast", "warmth", "n_colours", "palette_colours",
-            "gradient_stops", "gradient_png", "scale", "chords", "sevenths", "tone", "melody", "drums",
+            "gradient_stops", "gradient_png", "near_stops", "mid_stops", "far_stops", "gradient_layers_png",
+            "scale", "chords", "sevenths", "tone", "melody", "drums",
             "top_elements", "elements", "fam_architecture", "fam_street_furniture", "fam_furniture",
             "fam_paving", "fam_nature", "fam_sky", "fam_people", "fam_vehicles", "fam_goods",
             "paving_material", "paving_material_conf", "architecture_style", "architecture_style_conf",
