@@ -1,0 +1,1242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d0c10">
+<title>Chroma Live</title>
+<style>
+  /* One dark look on purpose: a camera instrument, used outdoors and at night. */
+  :root {
+    --bg: #0d0c10;
+    --panel: #17151c;
+    --line: #2c2934;
+    --fg: #f3f0f7;
+    --muted: #a39dae;
+    --accent: #ffb347;
+    --go: #6fdc9b;
+    --warn: #ff7a6b;
+    --display: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--body); }
+  body { padding: env(safe-area-inset-top, 0px) max(14px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(14px, env(safe-area-inset-left, 0px)); }
+  .wrap { max-width: 560px; margin: 0 auto; display: grid; gap: 12px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-top: 10px; }
+  h1 { font: 600 20px/1 var(--display); letter-spacing: .02em; margin: 0; }
+  h1 small { font: 500 11px var(--mono); color: var(--muted); letter-spacing: .12em; text-transform: uppercase; margin-left: 6px; }
+  #status { font: 12px var(--mono); color: var(--muted); text-align: right; }
+
+  .stage { position: relative; border-radius: 18px; overflow: hidden; background: #000; aspect-ratio: 3 / 4; max-height: 62vh; width: 100%; }
+  .stage video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .stage .intro { position: absolute; inset: 0; display: grid; place-content: center; gap: 14px; padding: 24px; text-align: center; background: linear-gradient(160deg, #241c33, #0d0c10 60%, #33231a); }
+  .stage .intro p { margin: 0; color: var(--muted); max-width: 34ch; justify-self: center; }
+  .grad { position: absolute; left: 0; right: 0; bottom: 0; height: 14px; }
+  .hud { position: absolute; left: 10px; right: 10px; top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill { font: 600 12px var(--mono); padding: 5px 9px; border-radius: 999px; background: rgba(13, 12, 16, .72); border: 1px solid rgba(255, 255, 255, .14); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  .pill.speed { color: var(--bg); background: var(--accent); border-color: transparent; }
+
+  button { font: 600 15px var(--body); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.primary { background: var(--accent); color: #1a1208; border-color: transparent; font-size: 17px; padding: 14px 22px; }
+  button.on { background: var(--fg); color: var(--bg); }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  .controls button { flex: 1 1 auto; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 10px; }
+  .card h2 { font: 600 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0; }
+  .readout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+  .readout div { min-width: 0; }
+  .readout b { display: block; font: 600 18px var(--display); overflow-wrap: anywhere; }
+  .readout span { font: 11px var(--mono); color: var(--muted); }
+  .places { display: flex; flex-wrap: wrap; gap: 6px; }
+  .places button { font-size: 13px; padding: 7px 11px; border-radius: 999px; }
+  .chords { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font: 13px var(--mono); padding: 4px 9px 4px 4px; border-radius: 999px; background: #211e27; border: 1px solid transparent; }
+  .chip i { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); }
+  .chip.now { border-color: var(--fg); background: #322d3b; }
+  .meter { height: 8px; border-radius: 4px; background: #24212b; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  .bands { display: grid; grid-template-columns: repeat(4, 1fr); font: 11px var(--mono); color: var(--muted); }
+  .bands span.on { color: var(--accent); font-weight: 700; }
+  .sensors { font: 12px var(--mono); color: var(--muted); display: grid; gap: 2px; overflow-wrap: anywhere; }
+  .note { font-size: 13px; color: var(--muted); margin: 0; }
+  @media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Chroma Live<small>Barcelona</small></h1>
+    <div id="status">ready</div>
+  </header>
+
+  <div class="stage">
+    <video id="cam" playsinline muted autoplay></video>
+    <div class="intro" id="intro">
+      <p style="font:600 22px/1.2 var(--display);color:var(--fg)">Point your camera at the city and walk.</p>
+      <p>The colours set the key and chords, the place sets the genre, and your speed sets the energy. Allow camera, motion and location when asked.</p>
+      <button class="primary" id="start" type="button">Start</button>
+    </div>
+    <div class="hud" id="hud" hidden>
+      <span class="pill" id="hPlace">place</span>
+      <span class="pill" id="hTime">time</span>
+      <span class="pill speed" id="hSpeed">still</span>
+      <span class="pill" id="hBpm">bpm</span>
+    </div>
+    <div class="grad" id="grad"></div>
+  </div>
+
+  <div class="controls">
+    <button id="stop" type="button" hidden>Stop</button>
+    <button id="ai" type="button" hidden>Load AI place labels (about 90 MB)</button>
+    <button id="log" type="button" hidden>Download log (0 rows)</button>
+  </div>
+
+  <section class="card">
+    <h2>Now playing</h2>
+    <div class="readout">
+      <div><b id="rGenre">–</b><span>genre (from place)</span></div>
+      <div><b id="rKey">–</b><span>key (from main colour)</span></div>
+      <div><b id="rBpm">–</b><span id="rBpmWhy">tempo</span></div>
+      <div><b id="rTime">–</b><span>time of day (phone clock)</span></div>
+    </div>
+    <div class="chords" id="chords"></div>
+  </section>
+
+  <section class="card">
+    <h2>Speed</h2>
+    <div class="readout">
+      <div><b id="sKmh">0 km/h</b><span id="sSrc">waiting for sensors</span></div>
+      <div><b id="sBand">still</b><span>speed band</span></div>
+    </div>
+    <div class="meter"><i id="sMeter"></i></div>
+    <div class="bands"><span data-b="still">still</span><span data-b="walk">walk</span><span data-b="run">run · bike</span><span data-b="vehicle">vehicle</span></div>
+    <div class="sensors" id="sensors"></div>
+  </section>
+
+  <section class="card">
+    <h2>Place</h2>
+    <p class="note" id="aiNote">Pick a place, or load the AI labels to have CLIP guess it from the camera.</p>
+    <div class="places" id="places"></div>
+  </section>
+
+  <p class="note">Nothing leaves your phone except the one-off AI model download. The log stays on the phone until you download it.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tone@15.1.22/build/Tone.js"></script>
+<script type="module">
+// ---- music map: copied unchanged from music/src/chroma-map.js ----
+const BASE = 48;   // C3 (MIDI): key root = BASE + the main colour's pitch class
+const SECONDS = 10; // target length of one piece
+
+const MODES = {
+  lydian:     [0, 2, 4, 6, 7, 9, 11],
+  ionian:     [0, 2, 4, 5, 7, 9, 11],
+  mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  dorian:     [0, 2, 3, 5, 7, 9, 10],
+  aeolian:    [0, 2, 3, 5, 7, 8, 10],
+};
+
+// One genre per place. Each genre says:
+//   band     which set of instruments plays (built in chroma.js), also picks the drum kit
+//   tempo    [slowest, fastest] bpm; the picture's energy picks a value in between
+//   space    base reverb (room size): dry market … huge beach
+//   echo     base delay amount
+//   keys     how the chord instrument plays: arpeggio | comp | stab | strum | bell | none
+//   bass     how the bass plays: pattern | long (one note per bar) | walking | acid (16th squelch)
+//   pad      held chords underneath (true/false)
+//   sevenths always use 4-note chords (jazz, lo-fi)
+//   swing    0 = straight … 0.5 = heavy swing, on swingSub notes
+//   kickVel  how hard the kick hits (0 = no kick)
+//   patterns 16 steps per bar, x = hit, . = rest
+//   extras   signature sounds of the place
+const GENRES = {
+  green: {
+    genre: "classical", desc: "slow piano arpeggios, strings, cello and flute, birdsong; no drums",
+    band: "classical", tempo: [66, 84], space: 0.4, echo: 0.12,
+    keys: "arpeggio", bass: "long", pad: true, sevenths: false,
+    swing: 0, kickVel: 0, patterns: {}, extras: ["birds"],
+  },
+  street: {
+    genre: "lo-fi hip-hop", desc: "lazy swung boom-bap, dusty wobbly e-piano, tape hiss",
+    band: "lofi", tempo: [72, 88], space: 0.12, echo: 0.2,
+    keys: "comp", keysPattern: "x.......x.....x.", bass: "pattern", pad: false, sevenths: true,
+    swing: 0.45, swingSub: "16n", kickVel: 0.8,
+    patterns: { kick: "x......x..x.....", clap: "....x.......x...", hat: "x.x.x.x.x.x.x.x.", bass: "x......x..x....." },
+    extras: [],
+  },
+  transit: {
+    genre: "techno", desc: "driving four-on-the-floor, pumping synth stabs, station chime",
+    band: "techno", tempo: [124, 132], space: 0.2, echo: 0.25,
+    keys: "stab", keysPattern: "..x..x....x..x..", bass: "pattern", pad: true, sevenths: false,
+    swing: 0, kickVel: 1,
+    patterns: { kick: "x...x...x...x...", clap: "....x.......x...", hat: "xxxxxxxxxxxxxxxx", bass: "x.xxx.xxx.xxx.xx" },
+    extras: ["chime"],
+  },
+  club: {
+    genre: "acid techno", desc: "pounding kick, squelchy acid bassline, off-beat hats, crowd and glasses",
+    band: "techno", tempo: [128, 136], space: 0.22, echo: 0.3,
+    keys: "none", bass: "acid", acidPattern: "x.xxx.xx.xx.x.xx", pad: true, sevenths: false,
+    swing: 0, kickVel: 1,
+    patterns: { kick: "x...x...x...x...", clap: "....x.......x...", hat: "..x...x...x...x.", shaker: "xxxxxxxxxxxxxxxx", perc: "......x.......x." },
+    extras: ["crowd", "glass"],
+  },
+  market: {
+    genre: "rumba catalana", desc: "fast strummed guitar, palmas, cajón, market chatter; a dry, bright room",
+    band: "rumba", tempo: [100, 116], space: 0.06, echo: 0.08,
+    keys: "strum", keysPattern: "x.xx.xx.x.xx.xx.", bass: "pattern", pad: false, sevenths: false,
+    swing: 0.1, swingSub: "16n", kickVel: 0.7,
+    patterns: { kick: "x.......x.......", clap: "..x...x...x...x.", shaker: "xxxxxxxxxxxxxxxx", perc: "...x..x....x.x..", bass: "x..x..x...x.x..." },
+    extras: ["crowd"],
+  },
+  waterfront: {
+    genre: "ambient", desc: "very slow, no drums: wide pads, glassy bells, deep bass, waves and gulls",
+    band: "ambient", tempo: [60, 72], space: 0.6, echo: 0.45,
+    keys: "bell", bass: "long", pad: true, sevenths: false,
+    swing: 0, kickVel: 0, patterns: {}, extras: ["waves", "gulls"],
+  },
+  square: {
+    genre: "night jazz", desc: "swung ride, Rhodes comping, walking upright bass, breathy horn",
+    band: "jazz", tempo: [96, 124], space: 0.3, echo: 0.1,
+    keys: "comp", keysPattern: "x.....x.........", bass: "walking", pad: false, sevenths: true,
+    swing: 0.6, swingSub: "8n", kickVel: 0,
+    patterns: { ride: "x...x.x.x...x.x.", hat: "....x.......x..." },
+    extras: [],
+  },
+};
+
+const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+
+function modeFor({ warmth, brightness }) {
+  const score = warmth * 2 + (brightness - 0.5);
+  if (score > 0.6) return "lydian";
+  if (score > 0.35) return "ionian";
+  if (score > 0.1) return "mixolydian";
+  if (score > -0.05) return "dorian";
+  return "aeolian";
+}
+
+function hexToHsl(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { h: h / 6, s, l };
+}
+
+function chordName(notes) {
+  const third = notes[1] - notes[0];
+  const fifth = notes[2] - notes[0];
+  let q = third === 4 ? (fifth === 8 ? "aug" : "") : fifth === 6 ? "dim" : "m";
+  if (notes[3] !== undefined) q += notes[3] - notes[0] === 11 ? (q === "" ? "maj7" : "(maj7)") : "7";
+  return NOTE_NAMES[notes[0] % 12] + q;
+}
+
+// Share `total` bars between colours by weight; every colour gets at least 1 bar.
+function splitBars(weights, total) {
+  const sum = weights.reduce((a, b) => a + b, 0);
+  const exact = weights.map((w) => (w / sum) * total);
+  const out = exact.map((e) => Math.max(1, Math.round(e)));
+  let diff = out.reduce((a, b) => a + b, 0) - total;
+  while (diff !== 0) {
+    const dir = Math.sign(diff);
+    let best = -1, bestErr = -Infinity;
+    out.forEach((o, i) => {
+      const err = (o - exact[i]) * dir;
+      if ((dir < 0 || o > 1) && err > bestErr) { bestErr = err; best = i; }
+    });
+    out[best] -= dir;
+    diff -= dir;
+  }
+  return out;
+}
+
+// Small seeded random generator, so each scene always gets the same melody.
+function seeded(str) {
+  let a = [...str].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619), 2166136261) >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function buildScore(scene, seconds = SECONDS) {
+  const { mood, place } = scene;
+  const style = GENRES[place.label] ?? GENRES.street;
+
+  // Energy and tempo: contrast drives both, inside the genre's own range.
+  const energy = clamp((mood.contrast - 0.2) / 0.3, 0.25, 1);
+  const [slow, fast] = style.tempo;
+  const bpm = Math.round(slow + (fast - slow) * (energy - 0.25) / 0.75);
+  const bars = Math.max(3, Math.round((seconds * bpm) / 240)); // 1 bar = 240 / bpm seconds
+
+  // Key: the hue of the main colour (12 hues → 12 keys). Black, white and grey have
+  // no real hue, so the key comes from the biggest *colourful* area (size × saturation).
+  const stops = [...scene.stops].sort((a, b) => a[2] - b[2]);
+  const dominant = stops.reduce((a, b) => (b[1] > a[1] ? b : a));
+  const home = hexToHsl(dominant[0]);
+  const colourful = (st) => { const c = hexToHsl(st[0]); return c.l > 0.1 && c.l < 0.9 ? c.s : 0; };
+  const keyStop = stops.reduce((a, b) => (b[1] * colourful(b) > a[1] * colourful(a) ? b : a));
+  const pc = colourful(keyStop) > 0.15 ? Math.round(hexToHsl(keyStop[0]).h * 12) % 12 : 2; // all grey → D
+  const tonic = BASE + pc;
+  const mode = modeFor(mood);
+  const scale = MODES[mode];
+  const deg = (d) => scale[((d % 7) + 7) % 7] + 12 * Math.floor(d / 7);
+
+  // Chords: one per colour, read top → bottom of the image, in half-bar steps.
+  const halves = bars * 2;
+  const used = stops.length > halves
+    ? [...stops].sort((a, b) => b[1] - a[1]).slice(0, halves).sort((a, b) => a[2] - b[2])
+    : stops;
+  const lengths = splitBars(used.map((s) => s[1]), halves);
+  const voices = mood.n_colours > 4 || style.sevenths ? [0, 2, 4, 6] : [0, 2, 4];
+  // Usable chords in this mode: skip the harsh diminished one.
+  const good = [0, 1, 2, 3, 4, 5, 6].filter((d) => deg(d + 4) - deg(d) === 7);
+  let prev = -1;
+  let start = 0;
+  const chords = used.map(([hex, weight], i) => {
+    const { h, l } = hexToHsl(hex);
+    let idx = hex === dominant[0] ? 0 : Math.floor((((h - home.h) + (l - home.l) * 0.5 + 2) % 1) * good.length);
+    if (good[idx] === prev) idx = (idx + 2) % good.length; // same colour family twice → move on
+    const degree = good[idx];
+    prev = degree;
+    const notes = voices.map((v) => tonic + deg(degree + v));
+    const chord = {
+      hex, weight, degree, notes,
+      bass: tonic - 12 + deg(degree),
+      name: chordName(notes),
+      start: start * 8,
+      steps: lengths[i] * 8,
+    };
+    start += lengths[i];
+    return chord;
+  });
+
+  // Melody: a 2-bar rhythm motif (density from saturation) that follows the chords.
+  const rand = seeded(scene.name);
+  const density = 0.15 + mood.saturation * 0.45;
+  const motif = Array.from({ length: 32 }, (_, i) =>
+    rand() < (i % 2 === 0 ? density : density * 0.2) ? Math.floor(rand() * 3) : null,
+  );
+  const leadLift = mood.brightness > 0.45 ? 24 : 12;
+  const chordAt = (step) => chords.findLast((c) => step >= c.start);
+  const melody = Array.from({ length: bars * 16 }, (_, step) => {
+    const m = motif[step % 32];
+    return m === null ? null : tonic + deg(chordAt(step).degree + [0, 2, 4][m]) + leadLift;
+  });
+
+  return {
+    name: scene.name,
+    title: scene.name.replace(/_/g, " "),
+    place,
+    timeOfDay: scene.time_of_day,
+    mood,
+    stops,
+    style,
+    bpm,
+    bars,
+    seconds: +((bars * 240) / bpm).toFixed(2),
+    tonic,
+    keyHex: keyStop[0],
+    key: `${NOTE_NAMES[pc]} ${mode}`,
+    mode,
+    chords,
+    melody,
+    cutoff: Math.round(clamp(400 * 2 ** (mood.brightness * 6), 600, 12000)),
+    spread: Math.round(10 + mood.saturation * 60),
+    leadOn: mood.saturation > 0.3,
+    delayWet: +(style.echo + mood.saturation * 0.25).toFixed(2),
+    reverbWet: +(style.space + (1 - place.confidence) * 0.3).toFixed(2),
+    energy: +energy.toFixed(2),
+  };
+}
+
+// ---- sound engine: copied from music/src/chroma.js ----
+const transport = Tone.getTransport();
+const hz = (midi) => Tone.Frequency(midi, "midi").toFrequency();
+const barSec = (sc) => 240 / sc.bpm;
+const stepSec = (sc) => 15 / sc.bpm;
+// Shared effects. Reverb and delay are "sends": the scene sets how much goes in.
+const limiter = new Tone.Limiter(-1).toDestination();
+const master = new Tone.Volume(-4).connect(limiter);
+const reverb = new Tone.Reverb({ decay: 6, wet: 1 }).connect(master);
+const reverbSend = new Tone.Gain(0.3).connect(reverb);
+const wet = (node) => { node.connect(master); node.connect(reverbSend); return node; };
+const delay = wet(new Tone.PingPongDelay({ delayTime: "8n.", feedback: 0.35, wet: 1 }));
+const delaySend = new Tone.Gain(0.3).connect(delay);
+
+// --- Drum kit: one set of drums, re-tuned per genre (see KITS) ---------------
+const kick = new Tone.MembraneSynth({
+  pitchDecay: 0.04, octaves: 6,
+  envelope: { attack: 0.001, decay: 0.45, sustain: 0 },
+}).connect(master);
+
+const clapFilter = wet(new Tone.Filter(1800, "bandpass"));
+const clap = new Tone.NoiseSynth({
+  noise: { type: "pink" },
+  envelope: { attack: 0.001, decay: 0.18, sustain: 0 },
+  volume: -10,
+}).connect(clapFilter);
+
+const hatFilter = new Tone.Filter(8000, "highpass").connect(master);
+const hat = new Tone.NoiseSynth({
+  noise: { type: "white" },
+  envelope: { attack: 0.001, decay: 0.05, sustain: 0 },
+  volume: -18,
+}).connect(hatFilter);
+
+const shaker = new Tone.NoiseSynth({
+  noise: { type: "white" },
+  envelope: { attack: 0.001, decay: 0.03, sustain: 0 },
+  volume: -26,
+}).connect(new Tone.Filter(9000, "highpass").connect(master));
+
+const perc = new Tone.MembraneSynth({
+  pitchDecay: 0.008, octaves: 1.5,
+  envelope: { attack: 0.001, decay: 0.12, sustain: 0 },
+  volume: -14,
+});
+perc.connect(master);
+perc.connect(delaySend);
+
+const ride = new Tone.MetalSynth({ // jazz ride cymbal
+  envelope: { attack: 0.001, decay: 0.9, release: 0.3 },
+  harmonicity: 5.1, modulationIndex: 24, resonance: 5000, octaves: 1.2,
+  volume: -30,
+}).connect(wet(new Tone.Filter(3000, "highpass")));
+
+// How the kit is tuned per band: kick body, clap colour, hat length and brightness.
+const KITS = {
+  techno:    { note: "C1", kick: { pitchDecay: 0.05, octaves: 7, envelope: { decay: 0.55 } }, clap: 1800, hatDecay: 0.04, hatFreq: 8500 },
+  lofi:      { note: "D1", kick: { pitchDecay: 0.03, octaves: 4, envelope: { decay: 0.3 } }, clap: 1100, hatDecay: 0.025, hatFreq: 4500 },
+  rumba:     { note: "A1", kick: { pitchDecay: 0.012, octaves: 2, envelope: { decay: 0.15 } }, clap: 2800, hatDecay: 0.04, hatFreq: 9000 },
+  jazz:      { note: "F1", kick: { pitchDecay: 0.02, octaves: 3, envelope: { decay: 0.25 } }, clap: 1500, hatDecay: 0.06, hatFreq: 6500 },
+  classical: { note: "C1", kick: { pitchDecay: 0.08, octaves: 3, envelope: { decay: 0.8 } }, clap: 1500, hatDecay: 0.08, hatFreq: 9000 },
+  ambient:   { note: "C1", kick: { pitchDecay: 0.08, octaves: 3, envelope: { decay: 0.8 } }, clap: 1500, hatDecay: 0.08, hatFreq: 9000 },
+};
+
+// --- Place signatures ---------------------------------------------------------
+const birds = new Tone.Synth({
+  oscillator: { type: "sine" }, portamento: 0.04,
+  envelope: { attack: 0.005, decay: 0.05, sustain: 0.3, release: 0.05 },
+  volume: -22,
+});
+birds.connect(master);
+birds.connect(delaySend);
+
+const gull = new Tone.Synth({ // seagull: a high note that slides down
+  oscillator: { type: "triangle" }, portamento: 0.25,
+  envelope: { attack: 0.03, decay: 0.1, sustain: 0.6, release: 0.15 },
+  volume: -26,
+});
+gull.connect(wet(new Tone.Filter(2500, "bandpass")));
+
+const waveFilter = wet(new Tone.Filter(300, "lowpass"));
+const waves = new Tone.NoiseSynth({
+  noise: { type: "pink" },
+  envelope: { attack: 1.5, decay: 0.1, sustain: 1, release: 1.5 },
+  volume: -12,
+}).connect(waveFilter);
+
+const crowd = new Tone.NoiseSynth({ // murmur of people (club, market)
+  noise: { type: "brown" },
+  envelope: { attack: 1, decay: 0.1, sustain: 1, release: 1 },
+  volume: -28,
+}).connect(wet(new Tone.Filter({ frequency: 900, type: "bandpass", Q: 0.8 })));
+
+const glass = wet(new Tone.Synth({
+  oscillator: { type: "sine" },
+  envelope: { attack: 0.001, decay: 0.25, sustain: 0, release: 0.2 },
+  volume: -26,
+}));
+
+const chime = wet(new Tone.PolySynth(Tone.Synth, {
+  oscillator: { type: "sine" },
+  envelope: { attack: 0.005, decay: 1.5, sustain: 0, release: 1 },
+  volume: -12,
+}));
+
+// --- Bands: one set of instruments per genre ---------------------------------
+// Every band has the same parts (keys, pad, bass, lead) so the sequencer can
+// treat them alike. Only the active band is turned up; the others sit at 0.
+//   out     → chords and melody (goes through reverb)
+//   low     → bass (dry, so the low end stays clean)
+//   bright  → tone filter, opened by the photo's brightness, capped by `toneMax`
+function band(toneMax) {
+  const out = wet(new Tone.Gain(0));
+  const low = new Tone.Gain(0).connect(master);
+  const bright = new Tone.Filter(2000, "lowpass").connect(out);
+  return { out, low, bright, toneMax };
+}
+const withDelay = (synth, ...dest) => { dest.forEach((d) => synth.connect(d)); synth.connect(delaySend); return synth; };
+
+const bands = {
+  // Park → classical: piano-ish arpeggios, string section, cello, flute
+  classical: (() => {
+    const b = band(8000);
+    const flute = new Tone.Vibrato(5, 0.06).connect(b.bright);
+    return {
+      ...b,
+      keys: new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "triangle" },
+        envelope: { attack: 0.002, decay: 1.8, sustain: 0.04, release: 1.4 },
+        volume: -9,
+      }).connect(b.bright),
+      pad: new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "fatsawtooth", count: 3, spread: 20 },
+        envelope: { attack: 1.4, decay: 0.4, sustain: 0.8, release: 2.5 },
+        volume: -25,
+      }).connect(new Tone.Filter(1600, "lowpass").connect(b.bright)),
+      bass: new Tone.MonoSynth({
+        oscillator: { type: "sawtooth" },
+        filter: { Q: 1, type: "lowpass" },
+        envelope: { attack: 0.25, decay: 0.4, sustain: 0.8, release: 0.8 },
+        filterEnvelope: { attack: 0.3, decay: 0.6, sustain: 0.5, baseFrequency: 120, octaves: 2 },
+        volume: -16,
+      }).connect(b.low),
+      lead: withDelay(new Tone.Synth({
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.08, decay: 0.2, sustain: 0.6, release: 0.6 },
+        volume: -14,
+      }), flute),
+    };
+  })(),
+
+  // Street → lo-fi hip-hop: wobbly FM e-piano, soft bass, tape hiss, dull top end
+  lofi: (() => {
+    const b = band(3200);
+    const wow = new Tone.Vibrato(0.6, 0.06).connect(b.bright); // tape wobble
+    return {
+      ...b,
+      keys: new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 2, modulationIndex: 1.8,
+        oscillator: { type: "sine" }, modulation: { type: "sine" },
+        envelope: { attack: 0.005, decay: 1.4, sustain: 0.25, release: 0.9 },
+        modulationEnvelope: { attack: 0.005, decay: 0.4, sustain: 0.1, release: 0.4 },
+        volume: -8,
+      }).connect(wow),
+      bass: new Tone.MonoSynth({
+        oscillator: { type: "triangle" },
+        filter: { Q: 1, type: "lowpass" },
+        envelope: { attack: 0.01, decay: 0.5, sustain: 0.4, release: 0.2 },
+        filterEnvelope: { attack: 0.01, decay: 0.3, sustain: 0.3, baseFrequency: 180, octaves: 2 },
+        volume: -5,
+      }).connect(b.low),
+      lead: withDelay(new Tone.Synth({
+        oscillator: { type: "square" },
+        envelope: { attack: 0.01, decay: 0.25, sustain: 0.2, release: 0.3 },
+        volume: -24,
+      }), wow),
+      hiss: new Tone.Noise({ type: "pink", volume: -36 }).connect(new Tone.Filter(2500, "highpass").connect(b.out)),
+    };
+  })(),
+
+  // Station / club → techno: pumping synths; the club adds a distorted acid bass
+  techno: (() => {
+    const b = band(12000);
+    const pump = new Tone.Gain(1).connect(b.bright);
+    const pumpLow = new Tone.Gain(1).connect(b.low);
+    const grit = new Tone.Distortion(0.5).connect(pumpLow);
+    return {
+      ...b, pump, pumpLow,
+      pad: new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "fatsawtooth", count: 3, spread: 30 },
+        envelope: { attack: 0.8, decay: 0.5, sustain: 0.7, release: 2 },
+        volume: -21,
+      }).connect(pump),
+      keys: new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "fatsawtooth", count: 3, spread: 20 },
+        envelope: { attack: 0.005, decay: 0.2, sustain: 0, release: 0.1 },
+        volume: -16,
+      }).connect(pump),
+      bass: new Tone.MonoSynth({
+        oscillator: { type: "sawtooth" },
+        filter: { Q: 3, type: "lowpass" },
+        envelope: { attack: 0.005, decay: 0.2, sustain: 0.5, release: 0.1 },
+        filterEnvelope: { attack: 0.005, decay: 0.2, sustain: 0.3, baseFrequency: 90, octaves: 3 },
+        volume: -9,
+      }).connect(pumpLow),
+      acid: new Tone.MonoSynth({ // squelchy 303-style line: sharp resonant filter + slides
+        oscillator: { type: "sawtooth" },
+        filter: { Q: 14, type: "lowpass", rolloff: -24 },
+        envelope: { attack: 0.002, decay: 0.2, sustain: 0.2, release: 0.05 },
+        filterEnvelope: { attack: 0.002, decay: 0.16, sustain: 0.1, baseFrequency: 160, octaves: 4.4 },
+        portamento: 0.04,
+        volume: -16,
+      }).connect(grit),
+      lead: withDelay(new Tone.Synth({
+        oscillator: { type: "fatsquare", count: 2, spread: 15 },
+        envelope: { attack: 0.005, decay: 0.15, sustain: 0.3, release: 0.15 },
+        volume: -20,
+      }), b.bright),
+    };
+  })(),
+
+  // Market → rumba catalana: plucked "guitar" strings, round bass, very dry
+  rumba: (() => {
+    const b = band(12000);
+    return {
+      ...b,
+      guitar: Array.from({ length: 5 }, () =>
+        new Tone.PluckSynth({ attackNoise: 2, dampening: 3800, resonance: 0.95, volume: -2 }).connect(b.bright)),
+      bass: new Tone.MonoSynth({
+        oscillator: { type: "sine" },
+        filter: { Q: 1, type: "lowpass" },
+        envelope: { attack: 0.005, decay: 0.3, sustain: 0.2, release: 0.1 },
+        filterEnvelope: { attack: 0.005, decay: 0.2, sustain: 0.3, baseFrequency: 200, octaves: 2 },
+        volume: -4,
+      }).connect(b.low),
+      lead: withDelay(new Tone.PluckSynth({ attackNoise: 1, dampening: 5000, resonance: 0.97, volume: -2 }), b.bright),
+    };
+  })(),
+
+  // Beach → ambient: wide slow pad, glassy FM bells, deep sine bass
+  ambient: (() => {
+    const b = band(6000);
+    return {
+      ...b,
+      pad: new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "fattriangle", count: 3, spread: 40 },
+        envelope: { attack: 2.5, decay: 0.5, sustain: 0.8, release: 4 },
+        volume: -14,
+      }).connect(b.bright),
+      keys: withDelay(new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 3.01, modulationIndex: 10,
+        envelope: { attack: 0.001, decay: 2.5, sustain: 0, release: 2 },
+        modulationEnvelope: { attack: 0.001, decay: 0.8, sustain: 0, release: 0.5 },
+        volume: -20,
+      }), b.bright),
+      bass: new Tone.MonoSynth({
+        oscillator: { type: "sine" },
+        filter: { Q: 0, type: "lowpass" },
+        envelope: { attack: 0.8, decay: 0.5, sustain: 0.9, release: 2 },
+        filterEnvelope: { baseFrequency: 300, octaves: 0 },
+        volume: -12,
+      }).connect(b.low),
+      lead: withDelay(new Tone.Synth({
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.2, decay: 0.3, sustain: 0.5, release: 1.5 },
+        volume: -18,
+      }), b.bright),
+    };
+  })(),
+
+  // Square / bar at night → jazz: Rhodes-style FM piano, upright bass, breathy horn
+  jazz: (() => {
+    const b = band(5000);
+    const sax = new Tone.Vibrato(4.5, 0.05).connect(b.bright);
+    return {
+      ...b,
+      keys: new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 1, modulationIndex: 3.5,
+        oscillator: { type: "sine" }, modulation: { type: "sine" },
+        envelope: { attack: 0.003, decay: 2, sustain: 0.15, release: 1.2 },
+        modulationEnvelope: { attack: 0.002, decay: 0.3, sustain: 0.05, release: 0.3 },
+        volume: -9,
+      }).connect(b.bright),
+      bass: new Tone.MonoSynth({
+        oscillator: { type: "triangle" },
+        filter: { Q: 2, type: "lowpass" },
+        envelope: { attack: 0.004, decay: 0.5, sustain: 0.1, release: 0.2 },
+        filterEnvelope: { attack: 0.004, decay: 0.15, sustain: 0.2, baseFrequency: 150, octaves: 2.5 },
+        volume: -3,
+      }).connect(b.low),
+      lead: withDelay(new Tone.MonoSynth({
+        oscillator: { type: "sawtooth" },
+        filter: { Q: 1, type: "lowpass" },
+        envelope: { attack: 0.04, decay: 0.2, sustain: 0.6, release: 0.3 },
+        filterEnvelope: { attack: 0.05, decay: 0.3, sustain: 0.5, baseFrequency: 600, octaves: 1.5 },
+        volume: -19,
+      }), sax),
+    };
+  })(),
+};
+const hit = (pattern, step) => pattern?.[step] === "x";
+const has = (st, extra) => st.extras.includes(extra);
+const chordAt = (sc, s) => sc.chords.findLast((c) => s >= c.start);
+const toneHz = (sc) => Math.min(sc.cutoff, bands[sc.style.band].toneMax);
+
+function duck(b, time, depth) {
+  for (const g of [b.pump, b.pumpLow]) {
+    g.gain.cancelScheduledValues(time);
+    g.gain.setValueAtTime(1 - 0.65 * depth, time);
+    g.gain.linearRampToValueAtTime(1, time + 0.22);
+  }
+}
+
+// New piece: set its tempo, crossfade to its band, re-tune the kit, set the room.
+function enterScene(sc, time) {
+  const st = sc.style;
+  const BAR = barSec(sc);
+  transport.bpm.setValueAtTime(sc.bpm, time);
+  transport.swing = st.swing;
+  transport.swingSubdivision = st.swingSub ?? "8n";
+
+  for (const [name, b] of Object.entries(bands)) {
+    for (const node of [b.out, b.low]) {
+      node.gain.cancelScheduledValues(time);
+      node.gain.rampTo(name === st.band ? 1 : 0, 0.3, time);
+    }
+  }
+  const b = bands[st.band];
+  // start muffled and open up over 2 bars: a short build-up at the start of every piece
+  b.bright.frequency.cancelScheduledValues(time);
+  b.bright.frequency.setValueAtTime(250, time);
+  b.bright.frequency.exponentialRampToValueAtTime(toneHz(sc), time + Math.min(2, sc.bars - 1) * BAR);
+  reverbSend.gain.rampTo(sc.reverbWet, 0.3, time);
+  delaySend.gain.rampTo(sc.delayWet, 0.3, time);
+  b.pad?.set({ oscillator: { spread: sc.spread } });
+
+  const kit = KITS[st.band];
+  kick.set(kit.kick);
+  hat.set({ envelope: { decay: kit.hatDecay } });
+  clapFilter.frequency.setValueAtTime(kit.clap, time);
+  hatFilter.frequency.setValueAtTime(kit.hatFreq, time);
+
+  if (has(st, "chime")) { // three-note station announcement chime from the first chord
+    sc.chords[0].notes.forEach((n, i) => chime.triggerAttackRelease(hz(n + 24), "2n", time + i * 0.35));
+  }
+  if (has(st, "crowd")) crowd.triggerAttackRelease(sc.seconds - 0.5, time);
+}
+
+// How the chord instrument plays, per genre.
+function playKeys(b, st, sc, chord, s, step, time, v) {
+  const vel = 0.5 + 0.4 * v;
+  switch (st.keys) {
+    case "arpeggio": { // broken chords on 8th notes, up and down
+      if (step % 2) break;
+      const arp = [...chord.notes, chord.notes[0] + 12];
+      const order = [0, 1, 2, 3, 2, 1];
+      b.keys.triggerAttackRelease(hz(arp[order[(s / 2) % order.length]] + 12), "4n", time, vel * 0.8);
+      break;
+    }
+    case "comp": // jazz / lo-fi chord hits
+      if (hit(st.keysPattern, step)) b.keys.triggerAttackRelease(chord.notes.map(hz), "4n", time, vel);
+      break;
+    case "stab": // short techno stabs
+      if (hit(st.keysPattern, step)) b.keys.triggerAttackRelease(chord.notes.map(hz), "16n", time, vel);
+      break;
+    case "strum": { // guitar: down-strum on the beat, up-strum in between
+      if (!hit(st.keysPattern, step)) break;
+      const strings = [chord.bass + 12, ...chord.notes];
+      const order = step % 4 === 0 ? strings : [...strings].reverse();
+      order.forEach((n, i) => b.guitar[i].triggerAttack(hz(n), time + i * 0.012));
+      break;
+    }
+    case "bell": // two slow bell notes per bar, walking through the chord
+      if (step === 0 || step === 10) {
+        const i = (Math.floor(s / 16) + (step ? 2 : 0)) % chord.notes.length;
+        b.keys.triggerAttackRelease(hz(chord.notes[i] + 24), "2n", time, 0.6);
+      }
+      break;
+  }
+}
+
+// How the bass plays, per genre.
+function playBass(b, st, sc, chord, s, step, time) {
+  switch (st.bass) {
+    case "pattern":
+      if (hit(st.patterns.bass, step)) b.bass.triggerAttackRelease(hz(chord.bass), "8n", time);
+      break;
+    case "long": // one held note per bar (cello, sub bass)
+      if (step === 0) b.bass.triggerAttackRelease(hz(chord.bass), "1m", time);
+      break;
+    case "walking": { // root, third, fifth, then a half step below the next chord
+      if (step % 4) break;
+      const beat = step / 4;
+      const note = beat === 3
+        ? chordAt(sc, Math.min(s + 4, sc.bars * 16 - 1)).bass - 1
+        : chord.bass + [0, chord.notes[1] - chord.notes[0], chord.notes[2] - chord.notes[0]][beat];
+      b.bass.triggerAttackRelease(hz(note), "4n", time, beat === 0 ? 0.9 : 0.7);
+      break;
+    }
+    case "acid": { // 16th line jumping between root, octave and the chord's top note
+      if (!hit(st.acidPattern, step)) break;
+      const jumps = [0, 12, 0, chord.notes[2] - chord.notes[0], 0, 12, chord.notes[1] - chord.notes[0], 0];
+      const accent = step % 4 === 2;
+      b.acid.triggerAttackRelease(hz(chord.bass + jumps[step % 8]), "16n", time, accent ? 1 : 0.6);
+      break;
+    }
+  }
+}
+
+// =============================================================================
+// CHROMA LIVE: camera + speed → scene card → the team's music engine
+// =============================================================================
+const $ = (s) => document.querySelector(s);
+const clamp01 = (x) => Math.min(1, Math.max(0, x));
+const status = (t) => { $("#status").textContent = t; };
+
+// ---------- 1. Colour maths: the same rules as data_prep/extract_palette.py ----------
+const SIZE = 48, K = 6, MIN_WEIGHT = 0.05, MERGE_DIST = 12;
+const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const fLab = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+function rgb2lab(r, g, b) {
+  const R = lin(r), G = lin(g), B = lin(b);
+  const x = (0.4124 * R + 0.3576 * G + 0.1805 * B) / 0.95047;
+  const y = 0.2126 * R + 0.7152 * G + 0.0722 * B;
+  const z = (0.0193 * R + 0.1192 * G + 0.9505 * B) / 1.08883;
+  const fx = fLab(x), fy = fLab(y), fz = fLab(z);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+const toHex = (r, g, b) => "#" + [r, g, b].map((v) => Math.round(clamp01(v) * 255).toString(16).padStart(2, "0")).join("");
+
+const work = document.createElement("canvas");
+work.width = work.height = SIZE;
+const wctx = work.getContext("2d", { willReadFrequently: true });
+
+// centre square of the video frame, drawn into a small canvas
+function grab(video, ctx, size) {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw) return null;
+  const side = Math.min(vw, vh);
+  ctx.drawImage(video, (vw - side) / 2, (vh - side) / 2, side, side, 0, 0, size, size);
+  return ctx.getImageData(0, 0, size, size).data;
+}
+
+function analyse(video) {
+  const px = grab(video, wctx, SIZE);
+  if (!px) return null;
+  const n = SIZE * SIZE;
+  const lab = new Float32Array(n * 3), rgb = new Float32Array(n * 3), rows = new Float32Array(n);
+  let sumL = 0, sumL2 = 0, sumS = 0, warmNum = 0, warmDen = 0;
+  for (let i = 0; i < n; i++) {
+    const r = px[i * 4] / 255, g = px[i * 4 + 1] / 255, b = px[i * 4 + 2] / 255;
+    const [L, A, Bb] = rgb2lab(r, g, b);
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    const s = mx === 0 ? 0 : (mx - mn) / mx;
+    lab.set([L, A, Bb], i * 3); rgb.set([r, g, b], i * 3);
+    rows[i] = Math.floor(i / SIZE) / (SIZE - 1);
+    sumL += L / 100; sumL2 += (L / 100) ** 2; sumS += s;
+    warmNum += (Bb + 0.5 * A) * (0.2 + s); warmDen += 0.2 + s;
+  }
+  const meanL = sumL / n;
+  const mood = {
+    brightness: +meanL.toFixed(3),
+    saturation: +(sumS / n).toFixed(3),
+    contrast: +Math.min(Math.sqrt(Math.max(0, sumL2 / n - meanL ** 2)) / 0.3, 1).toFixed(3),
+    // extract_palette.py stores warmth as 0..1 (0.5 neutral); the music map wants it centred on 0
+    warmth: +(clamp01(0.5 + warmNum / warmDen / 60) - 0.5).toFixed(3),
+  };
+
+  // k-means in Lab, started from lightness quantiles so it is repeatable frame to frame
+  const order = [...Array(n).keys()].sort((a, b) => lab[a * 3] - lab[b * 3]);
+  let cent = Array.from({ length: K }, (_, k) => {
+    const i = order[Math.floor(((k + 0.5) / K) * n)];
+    return [lab[i * 3], lab[i * 3 + 1], lab[i * 3 + 2]];
+  });
+  const lbl = new Uint8Array(n);
+  for (let it = 0; it < 8; it++) {
+    const acc = Array.from({ length: K }, () => [0, 0, 0, 0]);
+    for (let i = 0; i < n; i++) {
+      let best = 0, bd = Infinity;
+      for (let k = 0; k < K; k++) {
+        const d = (lab[i * 3] - cent[k][0]) ** 2 + (lab[i * 3 + 1] - cent[k][1]) ** 2 + (lab[i * 3 + 2] - cent[k][2]) ** 2;
+        if (d < bd) { bd = d; best = k; }
+      }
+      lbl[i] = best;
+      const a = acc[best]; a[0] += lab[i * 3]; a[1] += lab[i * 3 + 1]; a[2] += lab[i * 3 + 2]; a[3]++;
+    }
+    cent = acc.map((a, k) => (a[3] ? [a[0] / a[3], a[1] / a[3], a[2] / a[3]] : cent[k]));
+  }
+  const cl = cent.map((c) => ({ lab: c, n: 0, y: 0, rgb: [0, 0, 0] }));
+  for (let i = 0; i < n; i++) {
+    const c = cl[lbl[i]]; c.n++; c.y += rows[i];
+    c.rgb[0] += rgb[i * 3]; c.rgb[1] += rgb[i * 3 + 1]; c.rgb[2] += rgb[i * 3 + 2];
+  }
+  cl.sort((a, b) => b.n - a.n);
+  const merged = [];
+  for (const c of cl) {
+    if (!c.n) continue;
+    const m = merged.find((m) => Math.hypot(...m.lab.map((v, j) => v - c.lab[j])) < MERGE_DIST);
+    if (m) {
+      const tot = m.n + c.n;
+      m.lab = m.lab.map((v, j) => (v * m.n + c.lab[j] * c.n) / tot);
+      m.n = tot; m.y += c.y; m.rgb = m.rgb.map((v, j) => v + c.rgb[j]);
+    } else merged.push({ ...c, rgb: [...c.rgb] });
+  }
+  const stops = merged
+    .filter((m) => m.n / n >= MIN_WEIGHT)
+    .map((m) => [toHex(m.rgb[0] / m.n, m.rgb[1] / m.n, m.rgb[2] / m.n), +(m.n / n).toFixed(3), +(m.y / m.n).toFixed(3)]);
+  mood.n_colours = stops.length;
+  return { mood, stops };
+}
+
+// ---------- 2. Time of day from the phone clock (Barcelona sun table, as in prepare_own_photos.py) ----------
+const SUN = { 1: [8.2, 17.7], 2: [7.9, 18.2], 3: [7.3, 18.8], 4: [7.2, 20.3], 5: [6.6, 20.9], 6: [6.3, 21.3],
+  7: [6.5, 21.3], 8: [7.0, 20.8], 9: [7.5, 20.0], 10: [8.0, 19.1], 11: [7.6, 17.6], 12: [8.1, 17.4] };
+function timeOfDay(d = new Date()) {
+  const [rise, set] = SUN[d.getMonth() + 1];
+  const h = d.getHours() + d.getMinutes() / 60;
+  if (Math.abs(h - rise) <= 1 || Math.abs(h - set) <= 1) return "golden hour";
+  return h > rise && h < set ? "day" : "night";
+}
+
+// ---------- 3. Speed: GPS, step rhythm and camera movement, fused and smoothed ----------
+const BANDS = ["still", "walk", "run", "vehicle"];
+const EDGES = [0.5, 2.0, 6.0];          // m/s between the bands
+const sp = { gps: null, gpsAt: 0, gpsAcc: null, lat: null, lon: null, last: null, steps: [], motionOn: false,
+  cam: 0, value: 0, band: "still", source: "none", lastStep: 0, hp: 0, g: 9.81 };
+
+function startGps() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.watchPosition((p) => {
+    const { latitude, longitude, speed, accuracy } = p.coords;
+    let v = Number.isFinite(speed) && speed >= 0 ? speed : null;
+    if (v === null && sp.last && accuracy < 25) {            // no speed from the phone: work it out from two fixes
+      const dt = (p.timestamp - sp.last.t) / 1000;
+      const dy = (latitude - sp.last.lat) * 111320, dx = (longitude - sp.last.lon) * 111320 * Math.cos(latitude * Math.PI / 180);
+      if (dt > 0.5) v = Math.hypot(dx, dy) / dt;
+    }
+    sp.last = { lat: latitude, lon: longitude, t: p.timestamp };
+    sp.lat = latitude; sp.lon = longitude; sp.gpsAcc = accuracy;
+    if (v !== null) { sp.gps = v; sp.gpsAt = performance.now(); }
+  }, () => { sp.gpsDenied = true; }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
+}
+
+function onMotion(e) {
+  const a = e.accelerationIncludingGravity;
+  if (!a || a.x === null) return;
+  sp.motionOn = true;
+  const mag = Math.hypot(a.x, a.y, a.z);
+  sp.g += (mag - sp.g) * 0.01;                 // slow average (~1.5 s) = gravity
+  const v = mag - sp.g;                        // what is left = bounce of each step
+  const now = performance.now();
+  if (v > 1.3 && sp.hp <= 1.3 && now - sp.lastStep > 260) { sp.steps.push(now); sp.lastStep = now; }
+  sp.hp = v;
+}
+
+function cadence() {                            // steps per minute over the last 4 s
+  const now = performance.now();
+  sp.steps = sp.steps.filter((t) => now - t < 4000);
+  return sp.steps.length >= 3 ? sp.steps.length * 15 : 0;
+}
+
+const camCanvas = document.createElement("canvas");
+camCanvas.width = camCanvas.height = 32;
+const camCtx = camCanvas.getContext("2d", { willReadFrequently: true });
+let prevGrey = null;
+function cameraMotion(video) {                  // how much the picture changed since the last look (0..1)
+  const px = grab(video, camCtx, 32);
+  if (!px) return;
+  const grey = new Float32Array(1024);
+  for (let i = 0; i < 1024; i++) grey[i] = (px[i * 4] + px[i * 4 + 1] + px[i * 4 + 2]) / 765;
+  if (prevGrey) {
+    let d = 0;
+    for (let i = 0; i < 1024; i++) d += Math.abs(grey[i] - prevGrey[i]);
+    sp.cam += (Math.min(1, (d / 1024) * 6) - sp.cam) * 0.3;
+  }
+  prevGrey = grey;
+}
+
+function updateSpeed() {
+  const now = performance.now();
+  const gpsFresh = sp.gps !== null && now - sp.gpsAt < 6000;
+  const spm = cadence();
+  const stepSpeed = spm ? (spm / 60) * (spm > 150 ? 1.1 : 0.72) : 0;   // stride: ~0.7 m walking, ~1.1 m running
+  let raw, source;
+  if (gpsFresh && sp.gps > 2.5 && sp.gps > stepSpeed) { raw = sp.gps; source = `GPS ±${Math.round(sp.gpsAcc ?? 0)} m`; }
+  else if (sp.motionOn) { raw = stepSpeed; source = spm ? `steps ${spm}/min` : "motion sensor"; }
+  else if (gpsFresh) { raw = sp.gps; source = `GPS ±${Math.round(sp.gpsAcc ?? 0)} m`; }
+  else { raw = sp.cam * 3; source = "camera movement"; }               // no sensors (laptop test)
+  sp.value += (raw - sp.value) * 0.25;                                 // ~3 s smoothing at 4 updates/s
+  sp.source = source;
+  // bands with a little hysteresis, so the music does not flicker at a boundary
+  const i = BANDS.indexOf(sp.band);
+  if (i < 3 && sp.value > EDGES[i] + 0.15) sp.band = BANDS[i + 1];
+  else if (i > 0 && sp.value < EDGES[i - 1] - 0.15) sp.band = BANDS[i - 1];
+  if (sp.band !== BANDS[i]) wantRebuild = true;
+}
+
+// ---------- 4. Place: manual, or CLIP in the browser (transformers.js) ----------
+// Prompts per music genre. They fix the gaps we saw on our own photos:
+// city views from the hills go to green, bars and restaurants to square, train windows to transit.
+const PROMPTS = {
+  green: ["a park with trees and grass", "a view over a city from a hill with trees", "a forest path on a hill"],
+  street: ["a city street with buildings", "a narrow old town street", "a busy avenue with traffic"],
+  transit: ["a metro station platform", "the view from a train window", "an airport terminal", "inside a bus or tram"],
+  club: ["a dark nightclub with coloured lights", "people dancing at a party"],
+  market: ["a food market with stalls", "a busy outdoor food festival"],
+  waterfront: ["a beach and the sea", "a harbour with boats", "a seaside promenade"],
+  square: ["a bar or restaurant interior", "a public square with people", "people eating at long tables"],
+};
+const LABELS = Object.keys(PROMPTS);
+const NAMES = { green: "park · hill", street: "street", transit: "transit", club: "club", market: "market", waterfront: "waterfront", square: "bar · square" };
+const place = { mode: "manual", label: "street", conf: 1, probs: null, clip: null, busy: false };
+
+function renderPlaces() {
+  const wrap = $("#places");
+  wrap.innerHTML = "";
+  const opts = (place.clip ? ["auto"] : []).concat(LABELS);
+  for (const k of opts) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = k === "auto" ? "Auto (AI)" : NAMES[k];
+    b.className = (k === "auto" ? place.mode === "auto" : place.mode === "manual" && place.label === k) ? "on" : "";
+    b.onclick = () => {
+      if (k === "auto") place.mode = "auto"; else { place.mode = "manual"; place.label = k; place.conf = 1; }
+      wantRebuild = true; renderPlaces(); render();
+    };
+    wrap.append(b);
+  }
+}
+
+async function loadClip() {
+  $("#ai").disabled = true;
+  $("#aiNote").textContent = "Downloading the AI model… this happens once, then the browser keeps it.";
+  try {
+    const { pipeline, env } = await import("https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2");
+    env.allowLocalModels = false;
+    env.backends.onnx.wasm.numThreads = 1;
+    const files = {};
+    place.clip = await pipeline("zero-shot-image-classification", "Xenova/clip-vit-base-patch32", {
+      quantized: true,
+      progress_callback: (p) => {
+        if (p.status === "progress" && p.total) {
+          files[p.file] = [p.loaded, p.total];
+          const [l, t] = Object.values(files).reduce((a, [x, y]) => [a[0] + x, a[1] + y], [0, 0]);
+          $("#ai").textContent = `Loading AI model ${Math.round((l / t) * 100)}%`;
+        }
+      },
+    });
+    place.mode = "auto";
+    $("#ai").hidden = true;
+    $("#aiNote").textContent = "AI labels on: CLIP guesses the place every few seconds. Tap a place to override it.";
+    renderPlaces();
+  } catch (err) {
+    $("#ai").disabled = false;
+    $("#ai").textContent = "Retry AI place labels";
+    $("#aiNote").textContent = `The AI model could not load (${err.message ?? err}). Pick the place by hand.`;
+  }
+}
+
+const clipCanvas = document.createElement("canvas");
+clipCanvas.width = clipCanvas.height = 224;
+const clipCtx = clipCanvas.getContext("2d", { willReadFrequently: true });
+async function classify(video) {
+  if (!place.clip || place.busy || place.mode !== "auto") return;
+  if (!grab(video, clipCtx, 224)) return;
+  place.busy = true;
+  try {
+    const prompts = LABELS.flatMap((k) => PROMPTS[k].map((p) => `a photo of ${p}`));
+    const out = await place.clip(clipCanvas.toDataURL("image/jpeg", 0.85), prompts);
+    const probs = Object.fromEntries(LABELS.map((k) => [k, 0]));
+    for (const { label, score } of out) probs[LABELS.find((k) => PROMPTS[k].some((p) => label.endsWith(p)))] += score;
+    // smooth over the last few guesses so the genre does not jump on one odd frame
+    place.probs = place.probs ? Object.fromEntries(LABELS.map((k) => [k, place.probs[k] * 0.5 + probs[k] * 0.5])) : probs;
+    const best = LABELS.reduce((a, b) => (place.probs[b] > place.probs[a] ? b : a));
+    if (best !== place.label) wantRebuild = true;
+    place.label = best;
+    place.conf = +place.probs[best].toFixed(2);
+  } catch (err) { console.warn(err); }
+  place.busy = false;
+}
+
+// ---------- 5. Speed → music (blended with the photo's contrast) ----------
+const SPEED_ENERGY = { still: 0.25, walk: 0.55, run: 0.85, vehicle: 1 };
+const SPEED_SECONDS = { still: 12, walk: 10, run: 8, vehicle: 8 };
+let latest = null;            // last analysed frame
+let wantRebuild = false;
+
+function liveScore() {
+  const f = latest ?? { mood: { brightness: 0.5, saturation: 0.3, contrast: 0.4, warmth: 0, n_colours: 3 }, stops: [["#6f7a88", 0.5, 0.3], ["#b9a38a", 0.5, 0.8]] };
+  const band = sp.band;
+  // energy = 40 % picture contrast + 60 % speed; buildScore reads energy from contrast, so pass it that way
+  const picE = Math.min(1, Math.max(0.25, (f.mood.contrast - 0.2) / 0.3));
+  const energy = 0.4 * picE + 0.6 * SPEED_ENERGY[band];
+  const scene = {
+    name: `${place.label}_${f.stops[0]?.[0] ?? "x"}`,
+    place: { label: place.label, confidence: place.conf },
+    time_of_day: timeOfDay(),
+    mood: { ...f.mood, contrast: 0.2 + 0.3 * energy },
+    stops: f.stops.length ? f.stops : [["#808080", 1, 0.5]],
+  };
+  const sc = buildScore(scene, SPEED_SECONDS[band]);
+  if (band === "vehicle") { sc.bpm += 6; sc.seconds = +((sc.bars * 240) / sc.bpm).toFixed(2); }
+  sc.speedBand = band;
+  sc.picEnergy = picE;
+  return sc;
+}
+
+// ---------- 6. Sequencer: the team's loop, but each piece is built from the live camera ----------
+let cur = null, s = 0;
+new Tone.Loop((time) => {
+  if (!cur || s >= cur.bars * 16 || (wantRebuild && s % 16 === 0)) {
+    wantRebuild = false;
+    cur = liveScore();
+    s = 0;
+    enterScene(cur, time);
+  }
+  const sc = cur, st = sc.style, p = st.patterns, b = bands[st.band], kit = KITS[st.band];
+  const step = s % 16, chord = chordAt(sc, s), v = sc.energy;
+  const still = sc.speedBand === "still", fast = sc.speedBand === "run" || sc.speedBand === "vehicle";
+
+  // drums: still = no drums (pads and chords only); running or riding = busier hats and shaker
+  if (!still) {
+    if (hit(p.kick, step) && st.kickVel > 0) { kick.triggerAttackRelease(kit.note, "8n", time, (0.5 + 0.5 * v) * st.kickVel); if (b.pump) duck(b, time, v); }
+    if (hit(p.clap, step)) clap.triggerAttackRelease("16n", time, 0.4 + 0.6 * v);
+    const hatOn = hit(p.hat, step) || (fast && (p.hat || p.kick) && step % 2 === 1);
+    if (hatOn) hat.triggerAttackRelease("32n", time, (0.3 + 0.7 * v) * (step % 4 === 2 ? 1 : 0.55));
+    if (hit(p.ride, step)) ride.triggerAttackRelease(300, "8n", time, (0.5 + 0.5 * v) * (step % 4 === 0 ? 1 : 0.7));
+    if (hit(p.shaker, step) || (fast && st.kickVel > 0)) shaker.triggerAttackRelease("32n", time, step % 2 ? 0.5 : 1);
+    if (hit(p.perc, step)) perc.triggerAttackRelease(hz(chord.notes[step % chord.notes.length] + 12), "32n", time);
+  }
+  playKeys(b, st, sc, chord, s, step, time, v);
+  playBass(b, st, sc, chord, s, step, time);
+  if (st.pad && b.pad && s === chord.start) b.pad.triggerAttackRelease(chord.notes.map(hz), chord.steps * stepSec(sc), time);
+  if (sc.leadOn && sc.melody[s] !== null && !still) b.lead.triggerAttackRelease(hz(sc.melody[s]), "8n", time);
+  if (has(st, "birds") && (s % 32 === 6 || s % 32 === 23)) {
+    const top = chord.notes[chord.notes.length - 1] + 36;
+    [0, 0.07, 0.14].forEach((dt, k) => birds.triggerAttackRelease(hz(top + [0, 4, 2][k]), "64n", time + dt));
+  }
+  if (has(st, "gulls") && (s % 32 === 9 || s % 32 === 12)) { gull.triggerAttack(hz(91), time); gull.setNote(hz(84), time + 0.12); gull.triggerRelease(time + 0.35); }
+  if (has(st, "waves") && s % 16 === 0) {
+    const BAR = barSec(sc);
+    waves.triggerAttackRelease(BAR - 0.5, time);
+    waveFilter.frequency.cancelScheduledValues(time);
+    waveFilter.frequency.setValueAtTime(250, time);
+    waveFilter.frequency.exponentialRampToValueAtTime(1400, time + BAR / 2);
+    waveFilter.frequency.exponentialRampToValueAtTime(250, time + BAR);
+  }
+  if (has(st, "glass") && (s % 64 === 27 || s % 64 === 50)) glass.triggerAttackRelease(hz(chord.notes[0] + 48), "32n", time);
+  const shown = sc, at = s;
+  Tone.getDraw().schedule(() => drawChord(shown, at), time);
+  s++;
+}, "16n").start(0);
+
+// ---------- 7. Page ----------
+const gradCss = (stops) => `linear-gradient(90deg, ${[...stops].sort((a, b) => a[2] - b[2]).map(([h, , y]) => `${h} ${Math.round(y * 100)}%`).join(", ")})`;
+let chordsFor = null;
+function drawChord(sc, at) {
+  if (sc !== chordsFor) {
+    chordsFor = sc;
+    $("#chords").innerHTML = sc.chords.map((c, j) => `<span class="chip" data-j="${j}"><i style="background:${c.hex}"></i>${c.name}</span>`).join("");
+    $("#rGenre").textContent = sc.style.genre;
+    $("#rKey").textContent = sc.key;
+    $("#rBpm").textContent = `${sc.bpm} bpm`;
+    $("#rBpmWhy").textContent = `speed ${sc.speedBand} + contrast ${Math.round(sc.picEnergy * 100)}% · range ${sc.style.tempo.join("–")}`;
+    $("#hBpm").textContent = `${sc.bpm} bpm`;
+  }
+  const j = sc.chords.indexOf(chordAt(sc, at));
+  document.querySelectorAll(".chip").forEach((el) => el.classList.toggle("now", +el.dataset.j === j));
+}
+
+function render() {
+  const kmh = sp.value * 3.6;
+  $("#sKmh").textContent = `${kmh < 10 ? kmh.toFixed(1) : Math.round(kmh)} km/h`;
+  $("#sSrc").textContent = sp.source;
+  $("#sBand").textContent = sp.band;
+  $("#sMeter").style.width = `${Math.min(100, (sp.value / 10) * 100)}%`;
+  document.querySelectorAll(".bands span").forEach((el) => el.classList.toggle("on", el.dataset.b === sp.band));
+  const gpsTxt = sp.gpsDenied ? "GPS: not allowed" : sp.gps === null ? "GPS: waiting for a fix" : `GPS: ${(sp.gps * 3.6).toFixed(1)} km/h ±${Math.round(sp.gpsAcc)} m`;
+  $("#sensors").innerHTML = `<span>${gpsTxt}</span><span>Steps: ${sp.motionOn ? `${cadence()}/min` : "motion sensor off"}</span><span>Camera movement: ${Math.round(sp.cam * 100)}%</span>`;
+  $("#hSpeed").textContent = `${sp.band} · ${kmh.toFixed(0)} km/h`;
+  $("#hPlace").textContent = `${NAMES[place.label]}${place.mode === "auto" ? ` ${Math.round(place.conf * 100)}%` : ""}`;
+  $("#hTime").textContent = timeOfDay();
+  $("#rTime").textContent = timeOfDay();
+  if (latest) $("#grad").style.background = gradCss(latest.stops);
+}
+
+// ---------- 8. Log for testing (one row every few seconds) ----------
+const log = [];
+function logRow() {
+  log.push({
+    time: new Date().toISOString(), lat: sp.lat?.toFixed(5) ?? "", lon: sp.lon?.toFixed(5) ?? "",
+    speed_kmh: (sp.value * 3.6).toFixed(1), band: sp.band, speed_source: sp.source,
+    place: place.label, place_mode: place.mode, place_conf: place.conf, time_of_day: timeOfDay(),
+    genre: cur?.style.genre ?? "", bpm: cur?.bpm ?? "", key: cur?.key ?? "",
+    brightness: latest?.mood.brightness ?? "", saturation: latest?.mood.saturation ?? "",
+    contrast: latest?.mood.contrast ?? "", warmth: latest?.mood.warmth ?? "",
+    colours: latest ? latest.stops.map((x) => x[0]).join(" ") : "",
+  });
+  $("#log").textContent = `Download log (${log.length} rows)`;
+}
+$("#log").onclick = () => {
+  if (!log.length) return;
+  const cols = Object.keys(log[0]);
+  const csv = [cols.join(","), ...log.map((r) => cols.map((c) => `"${String(r[c]).replace(/"/g, '""')}"`).join(","))].join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = `chroma-live-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.csv`;
+  a.click();
+};
+
+// ---------- 9. Start / stop ----------
+const video = $("#cam");
+let timers = [], wake = null;
+
+$("#start").onclick = async () => {
+  // iPhone only allows motion access and audio from inside the tap itself
+  const motionAsk = typeof DeviceMotionEvent !== "undefined" && DeviceMotionEvent.requestPermission
+    ? DeviceMotionEvent.requestPermission().catch(() => "denied") : Promise.resolve("granted");
+  const toneReady = Tone.start();
+  status("starting…");
+  try {
+    video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 640 } }, audio: false });
+    await video.play();
+  } catch (err) {
+    status("camera blocked");
+    $("#intro").querySelector("p").textContent = "The camera is blocked. Open this page over https, then allow camera access in Safari's settings for this site.";
+    return;
+  }
+  await motionAsk; // if refused, no events arrive and speed falls back to GPS / camera
+  window.addEventListener("devicemotion", onMotion);
+  startGps();
+  await toneReady;
+  try { wake = await navigator.wakeLock?.request("screen"); } catch {}
+
+  $("#intro").hidden = true;
+  $("#hud").hidden = false;
+  ["#stop", "#ai", "#log"].forEach((id) => { $(id).hidden = false; });
+  renderPlaces();
+
+  latest = analyse(video);
+  timers = [
+    setInterval(() => { latest = analyse(video) ?? latest; }, 2500),
+    setInterval(() => cameraMotion(video), 250),
+    setInterval(() => { updateSpeed(); render(); }, 250),
+    setInterval(() => classify(video), 4000),
+    setInterval(logRow, 3000),
+  ];
+  master.volume.value = -4;
+  if (bands.lofi.hiss.state !== "started") bands.lofi.hiss.start();
+  cur = null; s = 0;
+  transport.start("+0.1");
+  status("playing");
+};
+
+$("#stop").onclick = () => {
+  timers.forEach(clearInterval);
+  timers = [];
+  transport.stop();
+  transport.swing = 0;
+  for (const b of Object.values(bands)) { b.pad?.releaseAll(); b.keys?.releaseAll?.(); }
+  waves.triggerRelease(); crowd.triggerRelease();
+  if (bands.lofi.hiss.state === "started") bands.lofi.hiss.stop();
+  video.srcObject?.getTracks().forEach((t) => t.stop());
+  wake?.release?.();
+  $("#intro").hidden = false;
+  $("#hud").hidden = true;
+  $("#stop").hidden = true;
+  status(`stopped · ${log.length} log rows kept`);
+};
+$("#ai").onclick = loadClip;
+document.addEventListener("visibilitychange", async () => {
+  if (document.visibilityState === "visible" && timers.length) { try { wake = await navigator.wakeLock?.request("screen"); } catch {} }
+});
+</script>
+</body>
+</html>
