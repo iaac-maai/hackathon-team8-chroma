@@ -1,7 +1,7 @@
 ---
 license: other
 license_name: places365-non-commercial
-license_link: http://places2.csail.mit.edu/
+license_link: https://places2.csail.mit.edu/
 library_name: onnx
 tags:
   - autoencoder

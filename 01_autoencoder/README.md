@@ -1,7 +1,7 @@
 # 01 · Image side: from a photo to a scene card
 
 **Group 08 · Chroma · AI Methods hackathon, IAAC MaAI, 16–20 November 2026**
-**Owner of this part:** Akshat
+**Owner of this part:** Akshat · **Model:** [huggingface.co/iaac-maai/hackathon-team8-chroma-ae](https://huggingface.co/iaac-maai/hackathon-team8-chroma-ae)
 
 This folder is everything that happens to a photo **before** the music: it is cleaned, labelled,
 measured and compressed by an autoencoder, so that the app can send the music a
@@ -11,7 +11,7 @@ It works on a photo of **any city**. The model learns from 36,500 photos of plac
 world. **Barcelona** is our home city: the demo photos, our own photos and the Wikimedia set are from here.
 
 > Status (Tuesday): data, labels, gradient maps, detail recognition, the library and the autoencoder
-> (three setups, ONNX checked) are done. Next: Hugging Face model card, Barcelona photos (Wikimedia) in the library.
+> (three setups, ONNX checked, on Hugging Face) are done. Next: Barcelona photos (Wikimedia) in the library.
 
 ---
 
@@ -187,7 +187,7 @@ warmth changing smoothly across it.
 normalised latent vector (ONNX = PyTorch, max difference 7 × 10⁻⁷). `model_app/` holds the ONNX file, `chroma_ae_config.json` and the library
 (latent vectors and labels, no photos). The notebook checks that ONNX gives the same numbers as PyTorch.
 
-Hugging Face: `iaac-maai/hackathon-team8-chroma-ae` (after the run).
+**Hugging Face:** [iaac-maai/hackathon-team8-chroma-ae](https://huggingface.co/iaac-maai/hackathon-team8-chroma-ae) (ONNX model, search library, model card with figures and a *How to use* snippet).
 
 ## 5. How to run
 
