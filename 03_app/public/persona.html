@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chroma · how you listen</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body><main>
+  <div class="kick"><a href="/">← Chroma</a></div>
+  <h1>How do you listen?</h1>
+  <p>The place still picks the genre and key. Your type shifts the tempo, chords, drums and sound inside it.
+     The next photo or live walk plays with your new type.</p>
+  <form class="card" method="post" action="/api/persona">
+    <fieldset class="personas">
+      <legend>Your type now: <b id="now">no type</b></legend>
+      <label class="persona"><input type="radio" name="persona" value="mellow"><b>Mellow</b><span>calm, dreamy, soft</span></label>
+      <label class="persona"><input type="radio" name="persona" value="unpretentious"><b>Unpretentious</b><span>easy, warm, acoustic</span></label>
+      <label class="persona"><input type="radio" name="persona" value="sophisticated"><b>Sophisticated</b><span>curious, rich chords, surprises</span></label>
+      <label class="persona"><input type="radio" name="persona" value="intense"><b>Intense</b><span>loud, fast, powerful</span></label>
+      <label class="persona"><input type="radio" name="persona" value="contemporary"><b>Contemporary</b><span>rhythmic, danceable, beats</span></label>
+      <label class="persona none"><input type="radio" name="persona" value=""><b>No type</b><span>just the place</span></label>
+    </fieldset>
+    <div class="row"><button class="primary">Save</button></div>
+  </form>
+</main>
+<script>
+  // The persona cookie is readable on purpose (Bo's player reads it too)
+  const now = document.cookie.match(/(?:^|;\s*)persona=([a-z]+)/)?.[1] || "";
+  const box = document.querySelector(`input[name=persona][value="${now}"]`) || document.querySelector('input[name=persona][value=""]');
+  box.checked = true;
+  document.getElementById("now").textContent = box.parentElement.querySelector("b").textContent.toLowerCase();
+</script>
+</body>
+</html>

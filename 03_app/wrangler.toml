@@ -1,0 +1,21 @@
+# Chroma on Cloudflare Pages: the page (public/) + the API (functions/) + D1 database (scene cards and small photos)
+name = "chroma-team8"
+pages_build_output_dir = "./public"
+compatibility_date = "2026-11-01"
+
+# Plain settings, readable by the functions as env.MODEL_URL
+[vars]
+# Our model server on Render (02_model_server), without a slash at the end
+MODEL_URL = "https://team8-chroma-model.onrender.com"
+MODEL_API_NAME = "predict"
+
+# The database: `npx wrangler d1 create chroma-db` prints the id to paste here
+[[d1_databases]]
+binding = "DB"
+database_name = "chroma-db"
+database_id = "d96b40e8-4b57-47bc-ad9e-730b50ba78f1"
+
+
+# The password is NOT here: it is a secret.
+# Local:   put APP_PASSWORD=... in a .dev.vars file (never commit it)
+# Online:  npx wrangler pages secret put APP_PASSWORD

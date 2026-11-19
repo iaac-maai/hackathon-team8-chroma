@@ -14,6 +14,10 @@ This project was made in one week for the **AI Methods hackathon** of the MaAI p
 
 ---
 
+> **Final version:** see [`04_final/README.md`](04_final/README.md): use case, live URLs, diagrams, statements and limitations.
+
+---
+
 ## How it works
 
 ```
@@ -90,10 +94,10 @@ To rebuild the photo data, follow [`01_autoencoder/data_prep/README.md`](01_auto
 
 | Day | Folder | Status |
 |---|---|---|
-| Mon | [`01_autoencoder/`](01_autoencoder/) · [`music/`](music/) | in progress |
-| Tue | `02_model_server/` | |
-| Wed | `03_app/` | |
-| Thu | `04_final/` | |
+| Mon | [`01_autoencoder/`](01_autoencoder/) · [`music/`](music/) | done |
+| Tue | model server: [`01_autoencoder/model_app/`](01_autoencoder/model_app/) | done, live on Render |
+| Wed | [`03_app/`](03_app/) | done, live on Cloudflare Pages |
+| Thu | [`04_final/`](04_final/): **final README, diagrams, proofs** | done |
 
 ## Team
 
@@ -101,15 +105,15 @@ To rebuild the photo data, follow [`01_autoencoder/data_prep/README.md`](01_auto
 |---|---|
 | Akshat | image side: data, place recognition, colours, model server |
 | Bhavini | app |
-| _to fill in_ | music generator |
+| Bo | music generator: Tone.js player, live walk, listener personality |
 
 ## Links
 
 | Part | Link |
 |---|---|
-| Model (Hugging Face) | `iaac-maai/hackathon-team8-chroma-ae` (coming) |
-| Model server (Render) | coming |
-| App (Cloudflare Pages) | coming |
+| Model (Hugging Face) | https://huggingface.co/iaac-maai/hackathon-team8-chroma-ae |
+| Model server (Render) | https://team8-chroma-model.onrender.com |
+| App (Cloudflare Pages) | https://chroma-team8.pages.dev (live walk at `/live/chroma`; password sent with the hand-in) |
 
 ## Data and licences
 

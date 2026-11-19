@@ -1,0 +1,2 @@
+# Copy to .dev.vars for local testing. Never commit .dev.vars.
+APP_PASSWORD=choose-a-local-test-password

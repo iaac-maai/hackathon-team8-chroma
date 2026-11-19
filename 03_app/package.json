@@ -1,0 +1,14 @@
+{
+  "name": "chroma-team8",
+  "private": true,
+  "description": "Chroma: a password-protected page that turns a photo into a scene card (our Render model) and music, stored in D1 and R2",
+  "scripts": {
+    "db:local": "wrangler d1 execute chroma-db --local --file=schema.sql",
+    "db:remote": "wrangler d1 execute chroma-db --remote --file=schema.sql",
+    "dev": "wrangler pages dev",
+    "deploy": "wrangler pages deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.156.1"
+  }
+}

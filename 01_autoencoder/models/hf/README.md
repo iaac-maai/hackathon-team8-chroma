@@ -79,7 +79,8 @@ query (79 test photos). **Chance = 0.218.** The model never sees a place label.
 
 - 0.35 precision means **most neighbours are another place**: the model groups by light and colour
   (a bright beach finds bright snowy mountains; old black-and-white photos find pale beaches).
-  Chroma takes the place label from CLIP, not from this model.
+  The deployed server (Render, free plan) has no room for CLIP, so it takes the place from a vote of the 10 most
+  similar library scenes found with this model; that is why place recognition is the weakest part of Chroma.
 - 64 × 64 px: small details (signs, doors, people) are lost in the reconstruction.
 - Trained on Places365, photographed worldwide, not in Barcelona.
 - Indoor scenes are fewer than outdoor ones; golden-hour and night photos are rare in the library.

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chroma · login</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body><main>
+  <div class="kick">Team 8 · IAAC AI Methods</div>
+  <h1>Chroma: hear a place</h1>
+  <p>Take a photo of a place. Chroma reads its light and colours and turns it into 10 seconds of music.</p>
+  <form class="card" method="post" action="/api/login">
+    <p>Password</p>
+    <div class="row">
+      <input type="password" name="password" autofocus required aria-label="Password">
+      <button class="primary">Enter</button>
+    </div>
+    <p id="wrong" class="status wait"></p>
+
+    <fieldset class="personas">
+      <legend>How do you listen? <small>(optional: the place still picks the genre, your type shapes how it plays)</small></legend>
+      <label class="persona"><input type="radio" name="persona" value="mellow"><b>Mellow</b><span>calm, dreamy, soft</span></label>
+      <label class="persona"><input type="radio" name="persona" value="unpretentious"><b>Unpretentious</b><span>easy, warm, acoustic</span></label>
+      <label class="persona"><input type="radio" name="persona" value="sophisticated"><b>Sophisticated</b><span>curious, rich chords, surprises</span></label>
+      <label class="persona"><input type="radio" name="persona" value="intense"><b>Intense</b><span>loud, fast, powerful</span></label>
+      <label class="persona"><input type="radio" name="persona" value="contemporary"><b>Contemporary</b><span>rhythmic, danceable, beats</span></label>
+      <label class="persona none"><input type="radio" name="persona" value="" checked><b>No type</b><span>just the place</span></label>
+      <p class="cite"><small>The five types are the MUSIC model of music taste (Rentfrow, Goldberg &amp; Levitin 2011).</small></p>
+    </fieldset>
+  </form>
+</main>
+<script>
+  if (new URLSearchParams(location.search).has("wrong")) document.getElementById("wrong").textContent = "Wrong password, try again.";
+</script>
+</body>
+</html>
