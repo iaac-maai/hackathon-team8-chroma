@@ -33,8 +33,10 @@ This project was made in one week for the **AI Methods hackathon** of the MaAI p
 2. **Scene card.** Everything is packed into one small JSON file: the agreed format between
    the image side, the app and the music
    ([format](music/scene-card/README.md)).
-3. **Make the music.** The music is generated live in the browser. Every sound is synthesised,
-   with no recordings or samples.
+3. **Make the music.** The music is composed live in the browser (Tone.js), not taken from a library of songs.
+   The place picks the genre family, the photo's feeling and your walking speed pick one of 38 styles, and the
+   colours pick the key and chords. It plays on synths plus recorded drum kits and a real piano. Full
+   explanation: [`music/ENGINE.md`](music/ENGINE.md).
 
 ### Place → genre
 
@@ -67,7 +69,7 @@ This project was made in one week for the **AI Methods hackathon** of the MaAI p
 | Folder | What it is |
 |---|---|
 | [`01_autoencoder/`](01_autoencoder/) | Image side: preparing the photo data (Places365, our own photos, Wikimedia Commons), recognising the place, measuring colours and gradient maps, plus a gradient map prototype |
-| [`music/`](music/) | Music side: the scene card format, the scene card → music generator and player, and a tool that learns genre rules from reference songs |
+| [`music/`](music/) | Music side: the scene card format, the music engine (feelings, 38 styles, composer, walk mode, listener personality) and its player, the source of `03_app/public/live`; see [`ENGINE.md`](music/ENGINE.md) |
 | [`impulse/`](impulse/) | Our impulse talk |
 
 ## Try it
@@ -125,6 +127,7 @@ To rebuild the photo data, follow [`01_autoencoder/data_prep/README.md`](01_auto
 | OpenStreetMap coastline | distance to the sea | ODbL |
 | Audio Spectrogram Transformer (MIT) | recognising the genre of reference songs | BSD-3-Clause |
 | Tone.js | making the sound in the browser | MIT |
+| Tone.js audio: drum samples, Salamander grand piano | the recorded drums and piano | piano: CC BY 3.0 |
 
 Photos and reference songs are **not** stored in this repository. The music rule book keeps only
 statistics, such as "kick on step 1 in 92 % of bars", never audio.

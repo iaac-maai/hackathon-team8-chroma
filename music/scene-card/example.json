@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "photo_8f3a2c",
   "place": { "label": "waterfront", "confidence": 0.86 },
   "time_of_day": "morning",
@@ -9,5 +9,12 @@
     ["#f4c9a8", 0.12, 0.3],
     ["#5f9cc4", 0.28, 0.55],
     ["#e6d6bc", 0.25, 0.88]
-  ]
+  ],
+  "indoor": { "value": false, "confidence": 0.97 },
+  "time": { "label": "day", "confidence": 0.9 },
+  "season": { "label": "summer", "confidence": 0.74 },
+  "paving": { "label": "sand", "confidence": 0.88 },
+  "details": { "crowd": 0.2, "nature": 0.75 },
+  "gradient": ["#2f5f80", "#4a7fa6", "#5f9cc4", "#8db8d6", "#b9d2e6", "#cfe3f2", "#e6d6bc", "#f4c9a8"],
+  "city": { "noise": 0.3, "traffic": 0.2, "nightlife": 0.3, "trees": 0.1, "sea": 1 }
 }
