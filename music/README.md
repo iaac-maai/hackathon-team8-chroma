@@ -1,12 +1,14 @@
-# music/: the Chroma music engine (Bo)
+# Bo's files: the music side
+
+The whole engine, step by step: [ENGINE.md](ENGINE.md).
 
 This folder turns a **scene card** (the place type and colours of a photo) into a short piece of music, played live in the browser with [Tone.js](https://tonejs.github.io/).
-The whole engine, step by step: [ENGINE.md](ENGINE.md).
+Only Bo edits this folder.
 
 ## Run it
 
 ```bash
-cd music
+cd Bo
 npm install
 npm run dev
 ```
@@ -18,7 +20,7 @@ Then open:
   and measures the colours. That scene card becomes a ~10 s piece and plays straight away.
   The hand-made example scenes are still there under "Example scenes".
   - The free server sleeps: the first photo after a pause takes about a minute.
-  - Another model server: `chroma.html?model=http://localhost:7860`, or `VITE_MODEL_URL` in `music/.env.local`.
+  - Another model server: `chroma.html?model=http://localhost:7860`, or `VITE_MODEL_URL` in `Bo/.env.local`.
   - The live camera works on `localhost` and `https` pages; elsewhere the button opens the phone's camera or file picker.
 - **http://localhost:5173/**: a 40-bar house track with a live step grid (the first Tone.js test).
 
@@ -47,7 +49,7 @@ Press **🚶 Walk mode**: the camera stays on and the music plays live while you
 Phones only allow the camera and motion sensors on `https`:
 
 ```bash
-cd music
+cd Bo
 npm run phone
 ```
 
@@ -118,7 +120,7 @@ Full details in [`scene-card/README.md`](scene-card/README.md).
 
 Every single piece (a photo, or one example) is recorded while it plays. At the end a **⬇ save sound** button
 appears (`chroma_<name>.wav`, 16-bit stereo, about 10 s plus the last chord ringing out), and the page fires an event
-that the app can use to store it, for example:
+that Bhavini's app can use to store it, for example in R2:
 
 ```js
 window.addEventListener("chroma:wav", (e) => {
@@ -131,7 +133,7 @@ Pressing stop halfway throws the recording away. Walk mode is not recorded.
 
 ### How the photo feels → the music (music psychology)
 
-Based on Akshat's research note on music psychology (sources at the end of [ENGINE.md](ENGINE.md)). Nothing plays before Akshat's model
+Based on Akshat's research note (`Akshat - Image processing/MUSIC_RESEARCH.md`). Nothing plays before Akshat's model
 has read the photo (place, colours, time, details); only when the model server can't be reached are the colours read on
 the phone. The scene card is turned into two numbers, **pleasantness** and **energy** (Russell 1980), in `src/emotion.js`:
 

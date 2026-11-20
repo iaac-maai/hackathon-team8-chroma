@@ -89,7 +89,7 @@ and mapped: beach → `waterfront`, metro and airport → `transit`, mountains �
 
 `type`: `mellow`, `unpretentious`, `sophisticated`, `intense` or `contemporary` (or just the string, `"listener": "mellow"`).
 The numbers are optional and override the type's defaults. The photo still sets the genre and key; the listener only
-shifts tempo, chords, drums and sound inside it. Details: `music/README.md`, "Listener personality".
+shifts tempo, chords, drums and sound inside it. Details: `Bo/README.md`, "Listener personality".
 
 ## Place labels → genres
 

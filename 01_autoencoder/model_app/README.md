@@ -1,6 +1,6 @@
 # Chroma model server
 
-One photo of a place in, one **scene card** out (the contract in `music/scene-card/README.md`, version 2).
+One photo of a place in, one **scene card** out (the contract in `Bo/scene-card/README.md`, version 2).
 Gradio page for people, `/predict` API for programs (Bhavini's app). ONNX Runtime + numpy only:
 about 180 MB of memory, so it fits Render's free plan.
 
@@ -10,7 +10,7 @@ about 180 MB of memory, so it fits Render's free plan.
 | `stops` `[hex, weight, y]` | the palette (k-means in Lab), top of the image → bottom |
 | `gradient` (8 colours) | the gradient map, same as `data_prep/extract_gradient.py` |
 | `place`, `time`, `season` (+ confidence) | our own place model if `place_model.onnx` is here; otherwise the autoencoder (`chroma_ae.onnx`) finds the 10 most similar library scenes; they vote, weighted by similarity. Confidence = share of the vote |
-| `layers` (top, middle, ground: colour, brightness, saturation, detail), `scan` (16 steps left → right), `detail` | measured from the pixels; for melody, bass, rhythm (see the team notes on picture layers → music layers) |
+| `layers` (top, middle, ground: colour, brightness, saturation, detail), `scan` (16 steps left → right), `detail` | measured from the pixels; for melody, bass, rhythm (see `../../MUSIC_LAYERS.md`) |
 | `indoor` | only with our own place model (`place_model.onnx`, from `data_prep/train_place_model.py`) |
 | `name` | the `name` you send, or a hash of the photo |
 
@@ -57,6 +57,6 @@ curl -N https://team8-chroma-model.onrender.com/gradio_api/call/embed/<event_id>
 
 ## Deploy on Render
 
-The Render service `team8-chroma-model` is created from the `render.yaml` of the team's workspace repo, which points Render to this folder (`rootDir`) and downloads `chroma_ae.onnx` from Hugging Face at build. (The `render.yaml` in this repository serves the prototype site.)
+`render.yaml` at the repository root points Render to this folder (`rootDir`).
 render.com → **New → Blueprint** → this repository → **Apply**. Region Frankfurt, free plan.
 The free server sleeps after 15 minutes: the first request after a pause takes about a minute.

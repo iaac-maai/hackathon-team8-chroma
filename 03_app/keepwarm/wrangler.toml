@@ -1,0 +1,13 @@
+# A tiny Cloudflare Worker that wakes the Render model every 10 minutes.
+# Deploy once:  cd keepwarm && npx --prefix .. wrangler deploy
+name = "chroma-keepwarm"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+# no public workers.dev address needed: the cron below runs it every 10 minutes
+workers_dev = false
+
+[vars]
+MODEL_URL = "https://team8-chroma-model.onrender.com"
+
+[triggers]
+crons = ["*/10 * * * *"]

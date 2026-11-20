@@ -1,7 +1,7 @@
 # The Chroma music engine
 
 How a photo, or a walk through Barcelona, becomes music. This document covers Bo's part of Chroma, the music side,
-from the scene card to the speaker. For how to run it, see [README.md](README.md). This folder is the source of the live walk player in `03_app/public/live`. For a short version to use
+from the scene card to the speaker. For how to run it, see [README.md](README.md). For a short version to use
 during the talk, see [talk/MUSIC_PARAMETERS.md](talk/MUSIC_PARAMETERS.md).
 
 ---
@@ -298,7 +298,7 @@ instruments ──► master (−4 dB) ──► leveller (auto gain) ──► 
 
 Every single piece (a photo or an example) is recorded while it plays. At the end the player shows a **⬇ save sound**
 button (a 16-bit stereo WAV) and fires a `chroma:wav` event with `{ blob, name, seconds, card, genre }`, which
-the app can use to store the file. Pressing stop throws the recording away. Walk mode is not recorded.
+Bhavini's app can use to store the file. Pressing stop throws the recording away. Walk mode is not recorded.
 
 ---
 
@@ -351,15 +351,13 @@ downloadable as a CSV.
 
 ---
 
-## 10. How the app uses the engine
+## 10. How the other apps use the engine
 
-- **The player page on its own:** `cd music && npm install && npm run dev`, then open `chroma.html`.
-  On a phone, `npm run phone` serves it over https on the Wi-Fi.
-- **Inside the app (`03_app`):** the same player is built into `03_app/public/live` and served at `/live/chroma`,
-  behind the app's login:
-  `cd music && VITE_MODEL_URL="" npx vite build --base ./ --outDir ../03_app/public/live`.
-  With `VITE_MODEL_URL` empty, the frames go to the app's own server code (`/gradio_api/call/predict`), which calls
-  Render and saves each view in D1.
+- **Bo's player page:** `chroma.html`, with `npm run dev`. On a phone, `npm run phone` serves it over https on the Wi-Fi.
+- **Bhavini's app:** `npm run build:music` in her folder builds Bo's player. It runs through `scripts/music-bridge.js`,
+  which gives the app `chromaLive.start/view/follow/now/stop`, `chromaPlayCard` and `chromaDescribe`.
+- **Akshat's app:** Bo's player is built into `public/live` with
+  `VITE_MODEL_URL="" npx vite build --base ./ --outDir "../Akshat - Image processing/03_app/public/live"`.
 - **Events to listen for:** `chroma:view` (the music switched) and `chroma:wav` (a piece was recorded).
 - **Page options:**
   - `?scene=<name>`: one example scene

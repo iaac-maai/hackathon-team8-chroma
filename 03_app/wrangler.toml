@@ -8,6 +8,8 @@ compatibility_date = "2026-11-01"
 # Our model server on Render (02_model_server), without a slash at the end
 MODEL_URL = "https://team8-chroma-model.onrender.com"
 MODEL_API_NAME = "predict"
+# Who can open the team dashboard /admin: chroma-jam usernames (Akshat, Bo, Bhavini), comma-separated
+ADMINS = "aksster, boderoeck, bhavini"
 
 # The database: `npx wrangler d1 create chroma-db` prints the id to paste here
 [[d1_databases]]

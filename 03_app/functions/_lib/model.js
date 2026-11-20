@@ -1,11 +1,14 @@
 // Everything about talking to our model server on Render, in one place.
 // The free Render server sleeps after 15 min; the first call then waits while it starts (about one minute)
-// or fails with 502/503/504. So: wait long enough, and if it still fails, try again a few times.
-// After about 90 s we give up and the API answers 503; the page then shows "the model is waking up" and retries.
+// or fails with 502/503/504. Our first call is enough to start it waking.
+// We never keep the phone waiting in silence for long: phones and mobile networks drop a request that gets no answer
+// for a minute or two, and the page then only sees "NetworkError" (bug of 20 Nov, BUG_photo_upload.md).
+// So after about 20 s we give up and the API answers 503; the page shows "the model is waking up" and asks again
+// every 10 s until the model is up.
 
-const DEADLINE_MS = 90000;          // stop trying after this
-const TRIES = 4;                    // tries in total
-const PAUSE_MS = [0, 5000, 10000, 15000]; // wait before try 1, 2, 3, 4
+const DEADLINE_MS = 20000;          // stop trying after this
+const TRIES = 3;                    // tries in total
+const PAUSE_MS = [0, 3000, 5000];   // wait before try 1, 2, 3
 
 // Gradio's HTTP API has two steps: start a job (POST -> event_id), then read its result (GET).
 
@@ -36,7 +39,7 @@ export async function startJob(env, body) {
 
 // Step 2: read the result stream, e.g. "event: complete\ndata: [ {...} ]". Returns the raw text.
 export async function readJob(env, eventId) {
-  const r = await fetchWithTimeout(`${jobUrl(env)}/${eventId}`, {}, 60000);
+  const r = await fetchWithTimeout(`${jobUrl(env)}/${eventId}`, {}, 25000);   // the model is awake by now: a few seconds
   return r.text();
 }
 

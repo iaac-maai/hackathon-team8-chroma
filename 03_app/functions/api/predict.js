@@ -5,7 +5,7 @@ import { personaFrom, addListener } from "../_lib/persona.js";
 // 1. send it to our model server on Render -> scene card,
 // 2. store the scene card and the small photo in D1, 3. answer the page (which turns the card into music).
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost({ request, env, data }) {
   const form = await request.formData();
   const file = form.get("image");
   if (!file || typeof file === "string") {
@@ -38,10 +38,10 @@ export async function onRequestPost({ request, env }) {
   const createdAt = new Date().toISOString();
   const label = (v) => (v && typeof v === "object" ? v.label : v) || null;
   await env.DB.prepare(
-    "INSERT INTO scenes (id, created_at, photo, photo_type, file_name, place, time, season, warmth, brightness, persona, card) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO scenes (id, created_at, photo, photo_type, file_name, place, time, season, warmth, brightness, persona, card, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   )
     .bind(id, createdAt, bytes.buffer, file.type || "image/jpeg", file.name || null, label(card.place), label(card.time) || card.time_of_day || null,
-          label(card.season), card.mood?.warmth ?? null, card.mood?.brightness ?? null, persona, JSON.stringify(card))
+          label(card.season), card.mood?.warmth ?? null, card.mood?.brightness ?? null, persona, JSON.stringify(card), data.user.id)
     .run();
 
   // 3. Answer the page

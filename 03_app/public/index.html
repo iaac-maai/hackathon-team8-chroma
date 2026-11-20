@@ -1,60 +1,317 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7e4e8">
 <title>Chroma</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Inter:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/style.css">
 <script src="https://cdn.jsdelivr.net/npm/tone@15.1.22/build/Tone.js"></script>
 </head>
-<body><main>
-  <div class="kick">Team 8 · photo → music</div>
-  <h1>Chroma: hear a place</h1>
-  <p>Walk with your phone camera on. Every few seconds our model reads the place, the light and the colours;
-     the music follows: a new place brings a new style, your steps set the tempo, layers build up while you walk.</p>
+<body>
+<canvas class="field" id="field" aria-hidden="true"></canvas><div class="grain" id="grain" aria-hidden="true"></div>
 
-  <div class="card live">
-    <a class="btn primary" href="/live/chroma">Start a live walk</a>
-    <p><small>On a phone: allow the camera and motion sensors, then tap <b>Walk</b>. Every view is saved.</small></p>
-    <p class="listening"><small>Listening as <b id="persona">no type</b> · <a href="/persona">change personality</a></small></p>
+<main>
+  <!-- the same top bar on every screen -->
+  <div class="top">
+    <a class="brand" href="#home">Chroma</a>
+    <a class="pill" href="/admin" id="dash-link" hidden>Dashboard</a>
+    <a class="pill" href="#friends">Friends <span class="badge" id="badge" hidden></span></a>
+    <button class="round info-open" type="button" aria-label="What Chroma is reading">i</button>
+    <a class="pill" href="/api/logout">Log out</a>
   </div>
-  <script>
-    // the readable persona cookie (set at login or on /persona)
-    { const p = document.cookie.match(/(?:^|;\s*)persona=([a-z]+)/)?.[1]; if (p) document.getElementById("persona").textContent = p; }
-  </script>
 
-  <h2>My walks <small>(every live view, saved in D1)</small></h2>
-  <div id="walks" class="walks"><small>loading…</small></div>
+  <!-- a friend started a jam (or I am in one) -->
+  <section class="panel banner" id="jam-banner" hidden aria-live="polite">
+    <div><span class="kick">Jam</span><p id="jam-banner-text"></p></div>
+    <button class="cta" id="jam-banner-go" type="button" style="width:auto">Join</button>
+  </section>
 
-  <h2>Step 01: one photo <small>(10 seconds of music)</small></h2>
-  <div class="card">
-    <div class="row">
-      <label class="btn primary" for="file">Take / upload a photo</label>
-      <input id="file" type="file" accept="image/*" capture="environment">
-      <button id="play" disabled>Play again</button>
-    </div>
-    <div id="status" class="status"></div>
-    <div id="result" hidden>
-      <img id="preview" alt="your photo">
-      <p style="margin:14px 0 4px"><b>Gradient map</b> · shadows → highlights</p>
-      <div id="gradient" class="strip"></div>
+  <!-- someone asked to be friends: accept here (a jam can only invite accepted friends) -->
+  <section class="panel banner" id="req-banner" hidden aria-live="polite">
+    <div><span class="kick">Friend request</span><p id="req-banner-text"></p></div>
+    <button class="cta" id="req-banner-go" type="button" style="width:auto">Accept</button>
+  </section>
+
+  <!-- HOME: the ways in -->
+  <div id="v-home" class="view">
+    <section class="panel hero">
+      <span class="kick" id="caption">Reading the sky…</span>
+      <h1>Hear the place you are in</h1>
+      <p class="muted">The colours behind this page are the sky where you are, right now. Walk with your camera and the music follows the street, read one photo, or jam with friends.</p>
+      <div class="strip" id="live-strip" aria-label="The 8 colours of the place now, shadows to highlights"></div>
+      <div class="chips">
+        <span class="chip" id="hello">Hi</span>
+        <a class="chip" href="/persona" title="Change how you listen">♪ <span class="persona-name">no type</span></a>
+        <button class="chip" id="src-loc" type="button">📍 Use my location</button>
+      </div>
+    </section>
+    <nav class="choices" aria-label="Choose">
+      <a class="choice" href="#walk"><span class="icon" aria-hidden="true">◎</span><span><b>Walk the street</b><span class="d">Camera on. The music follows what you see and your pace.</span></span><span class="go" aria-hidden="true">→</span></a>
+      <a class="choice" href="#photo"><span class="icon" aria-hidden="true">✦</span><span><b>Read a photo</b><span class="d">One photo becomes about 10 seconds of music.</span></span><span class="go" aria-hidden="true">→</span></a>
+      <a class="choice" href="#jam"><span class="icon" aria-hidden="true">⁂</span><span><b>Jam with friends</b><span class="d">One camera, the same music on every phone. Pass the camera around.</span></span><span class="go" aria-hidden="true">→</span></a>
+      <a class="choice" href="#music"><span class="icon" aria-hidden="true">♥</span><span><b>My music</b><span class="d">Your saved tracks and playlists. Share them with friends.</span></span><span class="go" aria-hidden="true">→</span></a>
+    </nav>
+  </div>
+
+  <!-- FRIENDS: add by username, requests, list, chat -->
+  <div id="v-friends" class="view" hidden>
+    <a class="chip back" href="#home">← Home</a>
+    <section class="panel hero">
+      <span class="kick" id="me-name">Friends</span>
+      <h1>Your friends</h1>
+      <p class="muted">Find friends by their username or their email address. Chat, and start a jam together.</p>
+      <form class="field-row" id="add-form" role="search">
+        <input class="text" type="search" id="add-name" placeholder="Username or email" autocapitalize="none" spellcheck="false" autocomplete="off" aria-label="Find a friend by username or email">
+        <button class="cta" type="submit" style="width:auto">Find</button>
+      </form>
+      <p class="status" id="add-status" role="status"></p>
+      <div class="list" id="find-results" aria-live="polite"></div>
+    </section>
+    <section class="panel" id="requests-panel" hidden>
+      <h2>Requests</h2>
+      <div class="list" id="requests"></div>
+    </section>
+    <section class="panel" id="chat-panel" hidden>
+      <div class="row"><h2 id="chat-title">Chat</h2><button class="round" id="chat-close" type="button" aria-label="Close the chat">×</button></div>
+      <div class="chat" id="chat" aria-live="polite"></div>
+      <form class="field-row" id="chat-form">
+        <input class="text" type="text" id="chat-text" maxlength="1000" placeholder="Write a message" aria-label="Message" autocomplete="off">
+        <button class="cta" type="submit" style="width:auto">Send</button>
+      </form>
+    </section>
+    <section class="panel">
+      <h2>Friends</h2>
+      <div class="list" id="friends"><small>Loading…</small></div>
+    </section>
+  </div>
+
+  <!-- JAM: invites, start one -->
+  <div id="v-jam" class="view" hidden>
+    <a class="chip back" href="#home">← Home</a>
+    <section class="panel hero">
+      <span class="kick">Jam</span>
+      <h1>Jam with friends</h1>
+      <p class="muted">Up to 6 people hear the same music, made from one camera. Whoever starts the jam drives; anyone can take over the camera, and the music never stops.</p>
+      <button class="cta" id="jam-rejoin" type="button" hidden>↺ Back to the jam</button>
+    </section>
+    <section class="panel" id="invites-panel" hidden>
+      <h2>Invites</h2>
+      <div class="list" id="invites"></div>
+    </section>
+    <section class="panel">
+      <h2>Start a jam <small>pick up to 5 friends</small></h2>
+      <div class="list" id="jam-pick"><small>Loading…</small></div>
+      <button class="cta" id="jam-start" type="button"><span aria-hidden="true">⁂</span> Start the jam</button>
+      <p class="status" id="jam-status" role="status"></p>
+    </section>
+  </div>
+
+  <!-- WALK: before you start, and your walks -->
+  <div id="v-walk" class="view" hidden>
+    <a class="chip back" href="#home">← Home</a>
+    <section class="panel hero">
+      <span class="kick">Walk mode</span>
+      <h1>Walk the street</h1>
+      <p class="muted">Point the camera at the street (or at yourself) and walk. Every few seconds Chroma reads the place, the light and the colours; the music changes with them, and your steps set the tempo.</p>
+      <div class="chips" role="group" aria-label="Which camera">
+        <button class="chip" id="cam-back" type="button" aria-pressed="true">Back camera · the street</button>
+        <button class="chip" id="cam-front" type="button" aria-pressed="false">Front camera · you</button>
+      </div>
+      <button class="cta" id="walk-start" type="button"><span aria-hidden="true">◎</span> Start walking</button>
+      <p class="status" id="walk-status" role="status"></p>
+      <p class="muted"><small>You will be asked for the camera, motion and location. The video is never recorded: only each view's colours and labels are saved with your walk.</small></p>
+    </section>
+    <section class="panel">
+      <h2>My walks <small>every view, saved</small></h2>
+      <div id="walks" class="walks"><small>Loading…</small></div>
+    </section>
+  </div>
+
+  <!-- PHOTO: read one photo, and your places -->
+  <div id="v-photo" class="view" hidden>
+    <a class="chip back" href="#home">← Home</a>
+    <section class="panel hero">
+      <span class="kick">Photo mode</span>
+      <h1>Read a photo</h1>
+      <p class="muted">Take a photo of a place or pick one from your library. Chroma reads it and plays about 10 seconds of music.</p>
+      <label class="cta" for="file" id="file-label"><span aria-hidden="true">✦</span> Take or upload a photo</label>
+      <input id="file" type="file" accept="image/*">
+    </section>
+    <section class="panel" id="reading" hidden>
+      <h2>Your place</h2>
+      <p id="status" class="status" role="status"></p>
+      <img id="preview" alt="Your photo">
+      <div>
+        <p class="muted"><small>Gradient map · shadows → highlights</small></p>
+        <div id="gradient" class="strip big"></div>
+      </div>
       <div id="tags" class="tags"></div>
-    </div>
+      <div class="row">
+        <button class="cta light" id="play" type="button" disabled>▶ Play again</button>
+        <button class="cta" id="save-photo" type="button" disabled style="width:auto">♥ Save</button>
+        <button class="cta light" id="back-live" type="button">↺ Sky colours</button>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>My places <small>still here after a reload</small></h2>
+      <div id="list" class="list"><small>Loading…</small></div>
+    </section>
   </div>
 
-  <h2>My places <small>(saved in D1, still here after a reload)</small></h2>
-  <div id="list" class="list"><small>loading…</small></div>
-  <p><small>Model: <a href="https://huggingface.co/iaac-maai/hackathon-team8-chroma-ae">Hugging Face</a> ·
-     model server: <a href="https://team8-chroma-model.onrender.com">Render</a> ·
-     full music player by Bo: <a href="https://chroma-4df6.onrender.com/live.html">live.html</a></small></p>
+  <!-- MY MUSIC: saved tracks, playlists, shared with me -->
+  <div id="v-music" class="view" hidden>
+    <a class="chip back" href="#home">← Home</a>
+    <section class="panel hero">
+      <span class="kick">My music</span>
+      <h1>Tracks and playlists</h1>
+      <p class="muted">Save a photo's piece, or 10 seconds of a walk or a jam. Each track is a small compressed file (about 40 KB) plus its recipe. Send a track to a friend, or share a playlist with up to 10 friends.</p>
+      <p class="status" id="music-status" role="status"></p>
+    </section>
+    <section class="panel">
+      <h2>My tracks</h2>
+      <div class="list" id="tracks"><small>Loading…</small></div>
+    </section>
+    <section class="panel">
+      <h2>My playlists</h2>
+      <form class="field-row" id="pl-form">
+        <input class="text" type="text" id="pl-name" maxlength="60" placeholder="New playlist name" aria-label="New playlist name" autocomplete="off">
+        <button class="cta" type="submit" style="width:auto">Create</button>
+      </form>
+      <div class="list" id="playlists"><small>Loading…</small></div>
+    </section>
+    <section class="panel" id="shared-panel" hidden>
+      <h2>Shared with me</h2>
+      <div class="list" id="shared-playlists"></div>
+    </section>
+    <section class="panel" id="pl-open" hidden aria-live="polite">
+      <div class="row"><h2 id="pl-title">Playlist</h2><button class="round" id="pl-close" type="button" aria-label="Close the playlist">×</button></div>
+      <p class="muted" id="pl-meta"></p>
+      <button class="cta" id="pl-playall" type="button">▶ Play all</button>
+      <div class="list" id="pl-tracks"></div>
+      <div id="pl-share-box" hidden>
+        <h2 style="font-size:20px">Share with friends <small>up to 10</small></h2>
+        <div class="list" id="pl-share"></div>
+        <button class="cta light" id="pl-share-save" type="button">Save sharing</button>
+      </div>
+    </section>
+    <audio id="player" preload="none"></audio>
+  </div>
+
+  <section class="panel">
+    <p class="muted"><small>Model: <a href="https://huggingface.co/iaac-maai/hackathon-team8-chroma-ae">Hugging Face</a> · model server: <a href="https://team8-chroma-model.onrender.com">Render</a> · weather: <a href="https://open-meteo.com/">Open-Meteo</a></small></p>
+  </section>
 </main>
 
-<script>
+<!-- WALKING: the live camera, full screen -->
+<section class="walklive" id="walklive" hidden aria-label="Walking">
+  <div class="cam" id="cam"></div>
+  <div class="walk-top">
+    <span class="brand">Chroma</span>
+    <span style="margin-right:auto"></span>
+    <button class="round" id="flip" type="button" aria-label="Switch between the back and front camera">⇆</button>
+    <button class="round info-open" type="button" aria-label="What Chroma is reading">i</button>
+  </div>
+  <div class="hud" id="hud" aria-live="polite"></div>
+  <div class="panel walk-dock">
+    <div class="people" id="jam-people" hidden aria-label="Who is in the jam"></div>
+    <div class="row"><span class="kick" id="w-state">Starting…</span><span class="kick" id="w-views"></span></div>
+    <h2 id="w-genre">Listening…</h2>
+    <p class="muted" id="w-meta">Starting the camera and the music…</p>
+    <div class="strip" id="w-strip" aria-label="The colours in view now"></div>
+    <button class="cta sound-btn" id="w-sound" type="button" hidden>🔊 Tap to turn the sound on</button>
+    <button class="cta light" id="w-save" type="button">♥ Save the next 10 s</button>
+    <button class="cta" id="w-stop" type="button">■ Stop and save the walk</button>
+    <div class="row" id="jam-acts" hidden>
+      <button class="cta" id="j-take" type="button">📷 Take the camera</button>
+      <button class="cta light" id="j-leave" type="button" style="width:auto">Leave</button>
+      <button class="cta" id="j-end" type="button" hidden>■ End the jam</button>
+    </div>
+  </div>
+</section>
+
+<iframe id="engine" title="Music engine" style="position:fixed;width:1px;height:1px;border:0;opacity:0;pointer-events:none" aria-hidden="true" tabindex="-1"></iframe>
+
+<aside class="sheet" id="sheet" hidden>
+  <div class="row"><h2>What Chroma reads</h2><button class="round" id="sheet-close" type="button" aria-label="Close">×</button></div>
+  <dl id="facts"></dl>
+</aside>
+
+<script type="module">
+import { livingGradient } from "/chroma-gradient.js";
+import { startWalk, askSensorPermission } from "/engine/walk.js";
+import { JamClient } from "/jam.js";
 const $ = (id) => document.getElementById(id);
 const lab = (v) => (v && typeof v === "object" ? v.label : v) || "?";
-let lastCard = null;
-fetch("/api/wake").catch(() => {});            // start waking the model while the visitor picks a photo
+const nice = (s) => String(s || "").replace(/_/g, " ");
+const persona = () => document.cookie.match(/(?:^|;\s*)persona=([a-z]+)/)?.[1] || null;
+document.querySelectorAll(".persona-name").forEach((el) => { el.textContent = persona() || "no type"; });
+let lastCard = null, liveState = null;
 
-// Make the photo small before sending it (the model works at 64-224 px anyway)
+// ── 1. the living gradient behind the page: the sky now (or a photo's colours, or the camera while walking)
+const g = livingGradient({ canvas: $("field"), grain: $("grain") });
+g.ambient();
+$("src-loc").onclick = async () => { $("src-loc").textContent = "📍 Locating…"; await g.ambient(true); $("src-loc").textContent = "📍 Use my location"; };
+$("back-live").onclick = () => g.ambient();
+g.onUpdate((s) => {
+  liveState = s;
+  if (s.mode === "ambient") $("caption").textContent = s.caption;
+  for (const id of ["live-strip", "w-strip"]) {
+    const st = $(id);
+    if (st.children.length !== s.colours.length) st.innerHTML = s.colours.map(() => "<i></i>").join("");
+    s.colours.forEach((c, i) => { st.children[i].style.background = c; });
+  }
+  if (!$("sheet").hidden) facts();
+});
+function facts() {
+  const s = liveState ?? g.state(), w = s.weather, sens = W.sensors?.state;
+  const rows = [
+    ["Source", { ambient: "the sky from your time and place", camera: `the ${g.facing() === "user" ? "front" : "back"} camera, live`, palette: "your last photo", intro: "–" }[s.mode]],
+    ["Time", `${s.time} · ${s.phase}`],
+    ...(s.place ? [["Place", s.place.label], ["Sun height", `${(s.sun ?? 0).toFixed(1)}°`]] : []),
+    ...(w ? [["Weather", `${w.temperature} °C, feels ${w.feels} °C · ${w.clouds}% cloud`]] : []),
+    ...(s.mood ? [["Brightness", s.mood.brightness], ["Warmth", s.mood.warmth]] : []),
+    ["Colours", s.colours.join(" ")],
+    ...(sens ? [["Speed", `${sens.band} · ${sens.kmh ?? 0} km/h · ${sens.cadence ? `${sens.cadence} steps/min` : "no steps yet"}`], ["Sensors", [...sens.sources].join(", ") || "none yet"]] : []),
+    ...(lastCard ? [["Last photo", `${lab(lastCard.place)} · ${lab(lastCard.time || lastCard.time_of_day)}`]] : []),
+  ];
+  $("facts").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v ?? "–"}</dd>`).join("");
+}
+document.querySelectorAll(".info-open").forEach((b) => { b.onclick = () => { facts(); $("sheet").hidden = false; }; });
+$("sheet-close").onclick = () => { $("sheet").hidden = true; };
+
+// ── 2. the music engine (Bo's), loaded early in a hidden frame so a tap can start the sound at once
+let engineWin = null;
+const engineReady = new Promise((ok, no) => {
+  const f = $("engine"); f.src = "/engine/chroma.html";
+  const t0 = performance.now();
+  (function wait() { const w = f.contentWindow; if (w?.chromaLive && w?.chromaAudio) { engineWin = w; ok(w); } else if (performance.now() - t0 > 30000) no(new Error("the music engine did not load")); else setTimeout(wait, 150); })();
+});
+engineReady.catch(() => {});
+function unlockSound() { try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch {} try { engineWin?.chromaAudio.unlock(); } catch {} try { Tone.start(); } catch {} }
+const soundOn = () => { try { return engineWin?.chromaAudio.state() === "running"; } catch { return false; } };
+
+fetch("/api/wake").catch(() => {});            // start waking the model right away
+
+// ── 3. screens: #home, #walk, #photo
+const VIEWS = ["home", "walk", "photo", "friends", "jam", "music"];
+function route() {
+  const h = (location.hash || "#home").slice(1), v = VIEWS.includes(h) ? h : "home";
+  if (W.on && v !== "walk") stopWalkMode();
+  for (const id of VIEWS) $(`v-${id}`).hidden = id !== v;
+  if (v !== "photo" && v !== "music" && !J.on) { try { engineWin?.chromaStop(); } catch {} stopSimple(); }
+  if (v === "walk") loadWalks();
+  if (v === "photo") loadList();
+  if (v === "friends") loadFriends();
+  if (v === "jam") loadJamView();
+  if (v === "music") loadMusic();
+  if (v !== "friends") closeChat();
+  scrollTo({ top: 0 });
+}
+addEventListener("hashchange", route);
+
+// ── 4. photo mode
 function shrink(file, size) {
   return new Promise((ok, fail) => {
     const img = new Image();
@@ -69,24 +326,26 @@ function shrink(file, size) {
     img.src = URL.createObjectURL(file);
   });
 }
-
 function setStatus(text, waiting) { $("status").textContent = text; $("status").className = "status" + (waiting ? " wait" : ""); }
-
 function show(card, src) {
-  $("result").hidden = false;
+  $("reading").hidden = false;
   if (src) $("preview").src = src;
   $("gradient").innerHTML = (card.gradient || []).map((c) => `<span style="background:${c}"></span>`).join("");
   const m = card.mood || {};
-  $("tags").innerHTML = [`place: ${lab(card.place)}`, `time: ${lab(card.time || card.time_of_day)}`,
-    `season: ${lab(card.season)}`, `warmth: ${m.warmth ?? "?"}`, `brightness: ${m.brightness ?? "?"}`]
-    .map((t) => `<span class="tag">${t}</span>`).join("");
+  $("tags").innerHTML = [["place", lab(card.place)], ["time", lab(card.time || card.time_of_day)], ["season", lab(card.season)],
+    ["warmth", m.warmth ?? "?"], ["brightness", m.brightness ?? "?"], ...(card.listener?.type ? [["listener", card.listener.type]] : [])]
+    .map(([k, v]) => `<span class="tag">${k} <b>${v}</b></span>`).join("");
+  g.palette(card.gradient);              // the page takes on the photo's colours
 }
-
-// Send the photo; while the Render server wakes up, say so and try again every 10 s (about 1.5 min)
-async function send(blob, name, tries = 0) {
+async function send(blob, name, tries = 0) {   // while Render wakes up: say so, try again every 10 s (about 1.5 min)
   const form = new FormData();
   form.append("image", blob, name);
-  const r = await fetch("/api/predict", { method: "POST", body: form });
+  let r;
+  try { r = await fetch("/api/predict", { method: "POST", body: form }); }
+  catch (err) {   // no answer at all (the connection dropped, e.g. on mobile data): same as "still waking", try again
+    if (tries >= 9) throw new Error("No connection to Chroma. Check your internet and try again.");
+    r = { status: 503 };
+  }
   if (r.status === 401) { location.href = "/login"; throw new Error("Please log in again."); }
   if (r.status === 503 && tries < 9) {
     setStatus(`The model is waking up, about one minute… (try ${tries + 1} of 9)`, true);
@@ -97,52 +356,54 @@ async function send(blob, name, tries = 0) {
   if (!r.ok) throw new Error(out.error || `Server said ${r.status}`);
   return out;
 }
-
+// the same music as the walk (Bo's engine); the small synth below only if the engine is not there
+async function playCard(card) {
+  if (persona() && !card.listener) card.listener = { type: persona() };
+  try { const w = engineWin ?? await Promise.race([engineReady, new Promise((_, no) => setTimeout(() => no(), 4000))]); await w.chromaPlayCard(card, { silent: false }); return; }
+  catch { simple(card); }
+}
+$("file-label").addEventListener("pointerdown", unlockSound);   // the tap that opens the picker also unlocks the sound
 $("file").addEventListener("change", async (e) => {
   const file = e.target.files[0]; if (!file) return;
-  $("play").disabled = true; setStatus("Reading the photo…");
+  $("play").disabled = true; $("reading").hidden = false; setStatus("Reading the photo…");
+  $("reading").scrollIntoView({ behavior: "smooth", block: "start" });
   try {
-    await Tone.start();                         // sound may only start after a click
     const blob = await shrink(file, 512);
-    $("result").hidden = false; $("preview").src = URL.createObjectURL(blob);
+    $("preview").src = URL.createObjectURL(blob);
     setStatus("Asking the model…");
     const out = await send(blob, file.name);
-    lastCard = out.card; show(lastCard);
-    setStatus("Saved. Playing 10 seconds…");
-    $("play").disabled = false; play(lastCard); loadList();
+    lastCard = out.card; show(lastCard); recordPhoto();
+    setStatus("Saved. Playing…");
+    $("play").disabled = false; playCard(lastCard); loadList();
   } catch (err) { setStatus("Something went wrong: " + err.message, true); }
   e.target.value = "";
 });
-$("play").addEventListener("click", async () => { await Tone.start(); if (lastCard) play(lastCard); });
+$("play").addEventListener("click", () => { unlockSound(); if (lastCard) playCard(lastCard); });
 
-// 10 seconds of music from the scene card: warmth picks major or minor, brightness the tempo and pitch,
-// the 8 gradient colours (shadows -> highlights) the melody, the place the sound.
+// small fallback synth (the first version of the app): warmth → major/minor, brightness → tempo, colours → melody
 function lightness(hex) { const n = parseInt(hex.slice(1), 16); return (0.3 * (n >> 16) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255)) / 255; }
 const SOUND = { green: "triangle", waterfront: "sine", street: "square4", transit: "sawtooth4", market: "square8", square: "triangle8", club: "fatsawtooth" };
 let parts = [], stopTimer = null;
-function play(card) {
-  Tone.Transport.stop(); Tone.Transport.cancel(); parts.forEach((p) => p.dispose()); parts = [];
-  clearTimeout(stopTimer);
+function stopSimple() { try { Tone.Transport.stop(); Tone.Transport.cancel(); parts.forEach((p) => p.dispose()); parts = []; clearTimeout(stopTimer); } catch {} }
+function simple(card) {
+  stopSimple();
   const m = card.mood || {}, warm = (m.warmth ?? 0) >= 0, bright = m.brightness ?? 0.5;
   const scale = warm ? [0, 2, 4, 7, 9, 12, 14, 16] : [0, 2, 3, 7, 8, 12, 14, 15];
   const root = 50 + Math.round(bright * 10);
   const notes = (card.gradient || ["#808080"]).map((c) => Tone.Frequency(root + scale[Math.min(7, Math.floor(lightness(c) * 8))], "midi"));
-  const synth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: SOUND[lab(card.place)] || "triangle" },
-    envelope: { attack: 0.02, release: 0.8 } }).toDestination();
+  const synth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: SOUND[lab(card.place)] || "triangle" }, envelope: { attack: 0.02, release: 0.8 } }).toDestination();
   const bass = new Tone.MonoSynth({ oscillator: { type: "sine" } }).toDestination();
   synth.volume.value = -10; bass.volume.value = -12; parts.push(synth, bass);
   Tone.Transport.bpm.value = 70 + bright * 60;
   let i = 0;
-  const loop = new Tone.Loop((t) => {
+  parts.push(new Tone.Loop((t) => {
     synth.triggerAttackRelease(notes[i % notes.length], "8n", t);
     if (i % 4 === 0) bass.triggerAttackRelease(Tone.Frequency(root - 12, "midi"), "2n", t);
     i++;
-  }, "8n").start(0);
-  parts.push(loop);
+  }, "8n").start(0));
   Tone.Transport.start();
   stopTimer = setTimeout(() => Tone.Transport.stop(), 10000);
 }
-
 async function loadList() {
   const r = await fetch("/api/history");
   if (r.status === 401) { location.href = "/login"; return; }
@@ -150,19 +411,129 @@ async function loadList() {
   $("list").innerHTML = rows.length ? rows.map((s) => `
     <div class="item">
       <img src="/api/images/${s.id}" alt="" loading="lazy">
-      <div><b>${s.place || "?"}</b> <small>${s.time || ""} · ${s.created_at.slice(0, 16).replace("T", " ")} UTC</small>
-        <div class="grad">${(s.card.gradient || []).map((c) => `<span style="background:${c}"></span>`).join("")}</div></div>
-      <button data-id="${s.id}">Play</button>
-    </div>`).join("") : "<small>No places yet. Take the first photo.</small>";
-  $("list").querySelectorAll("button").forEach((b) => b.onclick = async () => {
-    await Tone.start();
+      <div><div class="name">${s.place || "a place"}</div><small>${s.time || ""} · ${s.created_at.slice(0, 16).replace("T", " ")} UTC</small>
+        <div class="strip">${(s.card.gradient || []).map((c) => `<span style="background:${c}"></span>`).join("")}</div></div>
+      <button class="pill" data-id="${s.id}" aria-label="Play ${s.place || "this place"}">▶</button>
+    </div>`).join("") : '<p class="muted">No places yet. Take your first photo.</p>';
+  $("list").querySelectorAll("button").forEach((b) => b.onclick = () => {
+    unlockSound();
     const s = rows.find((x) => x.id === b.dataset.id);
-    lastCard = s.card; show(s.card, `/api/images/${s.id}`); $("play").disabled = false; play(s.card);
+    lastCard = s.card; show(s.card, `/api/images/${s.id}`); setStatus(""); $("play").disabled = false; playCard(s.card);
+    $("reading").scrollIntoView({ behavior: "smooth", block: "start" });
   });
 }
-loadList();
 
-// Each live view is one thin column of its gradient; views more than 2 minutes apart start a new walk
+// ── 5. walk mode: the live camera on screen, Bo's engine playing, your pace setting the tempo.
+//    Every few seconds one view goes to the model through our login and is saved in D1 (live_views).
+const W = { on: false, sensors: null, cam: false, facing: "environment", views: 0, saved: 0, timer: 0, follow: 0, inFlight: false, stillSince: null, place: "street", conf: 0.5, time: null, info: null };
+function setFacing(f) { W.facing = f; $("cam-back").setAttribute("aria-pressed", String(f === "environment")); $("cam-front").setAttribute("aria-pressed", String(f === "user")); }
+$("cam-back").onclick = () => setFacing("environment");
+$("cam-front").onclick = () => setFacing("user");
+function walkState() {
+  const s = W.sensors?.state ?? {};
+  if (s.band === "still") W.stillSince ??= performance.now(); else W.stillSince = null;
+  return { cadence: s.cadence || null, speed: s.speed ?? null, moving: !!s.moving, band: s.band || "still", fused: s.fused || 0,
+    sources: [...(s.sources || [])], source: s.source || "none", stillLong: W.stillSince !== null && performance.now() - W.stillSince > 8000 };
+}
+function cardFromColours() {             // no model in reach: the colours in view, read on the phone
+  const s = g.state(), cols = s.colours.length ? s.colours : ["#808080"];
+  return { version: 2, name: `view_${Date.now()}`, place: { label: W.place, confidence: W.conf },
+    time_of_day: s.phase === "golden hour" ? "golden_hour" : s.phase === "night" || s.phase === "blue hour" ? "night" : "day",
+    mood: { brightness: s.mood?.brightness ?? 0.5, warmth: s.mood?.warmth ?? 0, saturation: 0.5, contrast: 0.3, n_colours: cols.length },
+    stops: cols.map((c, i) => [c, +(1 / cols.length).toFixed(3), +(1 - i / Math.max(1, cols.length - 1)).toFixed(3)]).reverse(), gradient: cols };
+}
+async function modelCard() {             // one camera view → our server (login checked, saved) → Render
+  const v = g.video(); if (!v?.videoWidth) return null;
+  const c = document.createElement("canvas"); c.width = 384; c.height = Math.round(384 * v.videoHeight / v.videoWidth);
+  c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+  const start = await fetch("/gradio_api/call/predict", { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ data: [c.toDataURL("image/jpeg", 0.8), `walk_${Date.now()}`] }) });
+  if (start.status === 401) { location.href = "/login"; return null; }
+  if (start.status === 503) { $("w-state").textContent = "The model is waking up, about one minute"; return null; }
+  if (!start.ok) return null;
+  const { event_id } = await start.json();
+  const text = await (await fetch(`/gradio_api/call/predict/${event_id}${J.on && J.role === "driver" ? `?jam=${J.id}` : ""}`)).text();
+  const m = text.match(/event: complete\s*\ndata: (.*)/); if (!m) return null;
+  let card = JSON.parse(m[1])[0]; if (typeof card === "string") card = JSON.parse(card);
+  return card?.stops ? card : null;
+}
+function render(info) {
+  if (info) W.info = info;
+  const i = W.info, s = W.sensors?.state ?? {};
+  if (i) { $("w-genre").textContent = nice(i.genre) || "Listening…"; $("w-meta").textContent = `${i.key ?? ""} · ${i.bpm ?? "–"} bpm${persona() ? ` · listening as ${persona()}` : ""}`; }
+  const band = s.band || "still", kmh = Math.round(s.kmh ?? 0);
+  $("hud").innerHTML = [[nice(W.place)], [W.time || g.state().phase], [`${band} · ${kmh} km/h`, "hot"], ...(i?.bpm ? [[`${i.bpm} bpm`]] : [])]
+    .map(([t, cls]) => `<span class="chip ${cls || ""}">${t}</span>`).join("");
+  $("w-views").textContent = `${W.views} view${W.views === 1 ? "" : "s"}${W.saved ? ` · ${W.saved} saved` : ""}`;
+  $("w-sound").hidden = !W.on || soundOn();
+}
+async function takeView() {
+  if (!W.on || W.inFlight) return;
+  W.inFlight = true;
+  try {
+    let card = null;
+    if (W.cam) { try { card = await modelCard(); if (card) W.saved++; } catch {} }
+    if (card?.place?.label && (card.place.confidence ?? 0) >= 0.5) { W.place = card.place.label; W.conf = card.place.confidence; }
+    if (card) W.time = nice(lab(card.time || card.time_of_day));
+    if (!card) card = cardFromColours();
+    if (persona()) card.listener = { type: persona() };
+    W.views++;
+    $("w-state").textContent = card.name?.startsWith("view_") ? "Colours read on the phone" : "Read by the model";
+    W.lastCard = card;
+    render(engineWin.chromaLive.view(card, walkState()));
+  } finally {
+    W.inFlight = false;
+    if (W.on) W.timer = setTimeout(takeView, walkState().band !== "still" ? 3500 : 8000);
+  }
+}
+async function showCamera() {
+  try {
+    const v = await g.camera(W.facing);
+    v.classList.toggle("mirror", W.facing === "user");
+    if (v.parentElement !== $("cam")) $("cam").replaceChildren(v);
+    $("walklive").classList.remove("nocam");
+    W.cam = true; return true;
+  } catch {
+    W.cam = false;
+    $("cam").replaceChildren(); $("walklive").classList.add("nocam");
+    $("w-state").textContent = "No camera: allow it in your browser settings. The sky and your pace play for now.";
+    g.ambient(); return false;
+  }
+}
+async function startWalkMode() {
+  unlockSound();                                       // inside the tap: phones only allow sound to start here
+  const perm = askSensorPermission().catch(() => null);  // iPhone: motion permission must also be asked inside the tap
+  $("walk-status").textContent = "";
+  $("walklive").hidden = false; document.body.style.overflow = "hidden"; document.body.classList.add("live");
+  $("w-genre").textContent = "Listening…"; $("w-meta").textContent = "Starting the camera and the music…"; $("w-state").textContent = "Starting…";
+  await perm;
+  await showCamera();
+  let engine;
+  try { engine = await engineReady; await engine.chromaLive.start(); }
+  catch (e) { $("w-meta").textContent = `No sound: ${e.message}`; }
+  W.sensors = startWalk({ video: W.cam ? g.video() : null, onTurn: () => { clearTimeout(W.timer); takeView(); } });
+  W.on = true; W.views = 0; W.saved = 0; W.info = null;
+  if (engine) takeView();
+  W.follow = setInterval(() => { try { render(engineWin.chromaLive.follow(walkState())); } catch { render(); } }, 2000);
+  render();
+}
+function stopWalkMode() {
+  if (!W.on && $("walklive").hidden) return;
+  W.on = false; clearTimeout(W.timer); clearInterval(W.follow);
+  W.sensors?.stop(); W.sensors = null;
+  try { engineWin?.chromaLive.stop(); } catch {}
+  g.stopCamera(); g.ambient();
+  $("walklive").hidden = true; document.body.style.overflow = ""; document.body.classList.remove("live");
+  $("walk-status").textContent = W.saved ? `Walk saved: ${W.saved} view${W.saved === 1 ? "" : "s"}.` : W.views ? "Walk ended. Views are only saved when the model could read them." : "";
+  loadWalks();
+}
+$("walk-start").onclick = startWalkMode;
+$("w-stop").onclick = stopWalkMode;
+$("w-sound").onclick = () => { unlockSound(); setTimeout(() => (J.on ? jamHud() : render()), 300); };
+$("walklive").addEventListener("pointerdown", () => { if ((W.on || J.on) && !soundOn()) unlockSound(); });   // any tap on the walk screen also wakes the sound
+$("flip").onclick = async () => { setFacing(W.facing === "user" ? "environment" : "user"); await showCamera(); };
+
+// my walks: each view is one thin column of its colours; views more than 2 minutes apart start a new walk
 async function loadWalks() {
   const r = await fetch("/api/live");
   if (r.status === 401) return;
@@ -177,10 +548,469 @@ async function loadWalks() {
     const mins = Math.max(1, Math.round((new Date(w.at(-1).created_at) - new Date(w[0].created_at)) / 60000));
     return `<div class="walk"><div class="cols">${w.map((v) => `<span title="${v.place || "?"} · ${v.time || ""}">${
       (v.gradient || []).slice().reverse().map((c) => `<i style="background:${c}"></i>`).join("")}</span>`).join("")}</div>
-      <small>${w[0].created_at.slice(0, 16).replace("T", " ")} UTC · ${w.length} views · ~${mins} min · ${places.join(" → ")}</small></div>`;
-  }).join("") : "<small>No walks yet. Start a live walk.</small>";
+      <small>${w[0].created_at.slice(0, 16).replace("T", " ")} UTC · ${w.length} view${w.length === 1 ? "" : "s"} · about ${mins} min · ${places.join(" → ")}</small></div>`;
+  }).join("") : '<p class="muted">No walks yet. Start your first walk.</p>';
 }
-loadWalks();
+
+// ── 6. who am I (and the server clock)
+let ME = null;
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const ago = (iso) => { if (!iso) return "not seen yet"; const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 2 ? "here now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
+const initial = (u) => esc((u.name || u.username || "?").trim()[0] || "?");
+async function loadMe() {
+  const r = await fetch("/api/me"); if (r.status === 401) { location.href = "/login"; return; }
+  const me = await r.json(); ME = me.user;
+  g.near(me.near);   // the sky of the visitor's own city, until they allow GPS
+  $("dash-link").hidden = !ME.dashboard;   // only Akshat, Bo and Bhavini see the team dashboard
+  $("hello").textContent = ME.admin ? "Team (admin)" : `@${ME.username}`;
+  $("me-name").textContent = ME.admin ? "Friends" : `You are @${ME.username}`;
+}
+const teamOnly = (box) => { box.innerHTML = '<p class="muted">Friends, chat and jams need your own account. Log out and create one.</p>'; };
+
+// ── 7. friends and chat
+let FR = { friends: [], incoming: [], outgoing: [] };
+async function loadFriends() {
+  if (ME?.admin) { teamOnly($("friends")); return; }
+  const r = await fetch("/api/friends"); if (!r.ok) return;
+  FR = await r.json();
+  const n = FR.incoming.length + FR.friends.reduce((s, f) => s + f.unread, 0);
+  const ask = FR.incoming[0];
+  $("req-banner").hidden = !ask;
+  if (ask) {
+    $("req-banner-text").textContent = `@${ask.username} wants to be friends${FR.incoming.length > 1 ? ` (+${FR.incoming.length - 1} more)` : ""}. Accept to chat and jam together.`;
+    $("req-banner-go").onclick = async () => { await fetch(`/api/friends/${ask.friendship}`, { method: "POST" }); loadFriends(); if (!$("v-jam").hidden) loadJamView(); };
+  }
+  $("badge").hidden = !n; $("badge").textContent = n;
+  $("requests-panel").hidden = !(FR.incoming.length || FR.outgoing.length);
+  $("requests").innerHTML = [
+    ...FR.incoming.map((p) => `<div class="person"><span class="avatar">${initial(p)}</span><span class="who"><b>${esc(p.name)}</b><small>@${esc(p.username)} wants to be friends</small></span>
+      <span class="acts"><button class="pill" data-accept="${p.friendship}">Accept</button><button class="pill" data-drop="${p.friendship}" aria-label="Decline">×</button></span></div>`),
+    ...FR.outgoing.map((p) => `<div class="person"><span class="avatar">${initial(p)}</span><span class="who"><b>${esc(p.name)}</b><small>@${esc(p.username)} · waiting for them to accept</small></span>
+      <span class="acts"><button class="pill" data-drop="${p.friendship}" aria-label="Take back">×</button></span></div>`)].join("");
+  $("friends").innerHTML = FR.friends.length ? FR.friends.map((p) => `
+    <div class="person"><span class="avatar ${ago(p.last_seen) === "here now" ? "on" : ""}">${initial(p)}</span>
+      <span class="who"><b>${esc(p.name)}</b><small>@${esc(p.username)} · ${ago(p.last_seen)}</small></span>
+      <span class="acts"><button class="pill" data-chat="${p.id}">Chat${p.unread ? ` <span class="badge">${p.unread}</span>` : ""}</button></span></div>`).join("")
+    : '<p class="muted">No friends yet. Add someone by their username above.</p>';
+  document.querySelectorAll("[data-accept]").forEach((b) => b.onclick = async () => { await fetch(`/api/friends/${b.dataset.accept}`, { method: "POST" }); loadFriends(); });
+  document.querySelectorAll("[data-drop]").forEach((b) => b.onclick = async () => { await fetch(`/api/friends/${b.dataset.drop}`, { method: "DELETE" }); loadFriends(); });
+  document.querySelectorAll("[data-chat]").forEach((b) => b.onclick = () => openChat(b.dataset.chat));
+}
+// find friends: by the start of a username, or an exact email address (emails are never shown)
+let findTimer = 0, findSeq = 0;
+async function findPeople() {
+  const q = $("add-name").value.trim(), mine = ++findSeq;
+  if (q.replace(/^@/, "").length < 2) { $("find-results").innerHTML = ""; $("add-status").textContent = ""; return; }
+  const r = await fetch(`/api/users/search?q=${encodeURIComponent(q)}`); if (!r.ok || mine !== findSeq) return;
+  const { results } = await r.json();
+  $("add-status").className = "status";
+  $("add-status").textContent = results.length ? "" : q.includes("@") && !q.startsWith("@") ? "Nobody has that email address. Check it, or try their username." : `Nobody's username starts with “${q.replace(/^@/, "")}”.`;
+  const act = (p) => ({
+    none: `<button class="pill" data-add="${esc(p.username)}">Add</button>`,
+    asked_you: `<button class="pill" data-add="${esc(p.username)}">Accept</button>`,
+    requested: `<span class="pill" aria-disabled="true">Requested</span>`,
+    friend: `<button class="pill" data-chat="${p.id}">Chat</button>`,
+  })[p.relation];
+  $("find-results").innerHTML = results.map((p) => `<div class="person"><span class="avatar">${initial(p)}</span>
+    <span class="who"><b>${esc(p.name)}</b><small>@${esc(p.username)}${p.relation === "friend" ? " · already friends" : p.relation === "asked_you" ? " · wants to be friends" : ""}</small></span>
+    <span class="acts">${act(p)}</span></div>`).join("");
+  $("find-results").querySelectorAll("[data-add]").forEach((b) => b.onclick = async () => {
+    const r = await fetch("/api/friends", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: b.dataset.add }) });
+    const out = await r.json().catch(() => ({}));
+    $("add-status").textContent = out.message || out.error || ""; $("add-status").className = "status" + (r.ok ? "" : " wait");
+    await loadFriends(); findPeople();
+  });
+  $("find-results").querySelectorAll("[data-chat]").forEach((b) => b.onclick = () => openChat(b.dataset.chat));
+}
+$("add-name").oninput = () => { clearTimeout(findTimer); findTimer = setTimeout(findPeople, 250); };
+$("add-form").onsubmit = (e) => { e.preventDefault(); clearTimeout(findTimer); findPeople(); };
+const CHAT = { with: null, last: "", timer: 0 };
+function closeChat() { CHAT.with = null; clearInterval(CHAT.timer); $("chat-panel").hidden = true; }
+async function openChat(id) {
+  const f = FR.friends.find((x) => x.id === id); if (!f) return;
+  closeChat(); CHAT.with = id; CHAT.last = "";
+  $("chat-title").textContent = `Chat with @${f.username}`; $("chat").innerHTML = ""; $("chat-panel").hidden = false;
+  $("chat-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+  await pullChat(); loadFriends();
+  CHAT.timer = setInterval(pullChat, 2500);
+  $("chat-text").focus();
+}
+async function pullChat() {
+  if (!CHAT.with) return;
+  const r = await fetch(`/api/messages?with=${CHAT.with}&since=${encodeURIComponent(CHAT.last)}`); if (!r.ok) return;
+  const { messages } = await r.json();
+  if (!messages.length) { if (!$("chat").children.length) $("chat").innerHTML = '<p class="muted" id="chat-empty">No messages yet. Say hi.</p>'; return; }
+  $("chat-empty")?.remove();
+  for (const m of messages) {
+    $("chat").insertAdjacentHTML("beforeend", `<div class="msg ${m.mine ? "mine" : ""}">${esc(m.body)}${m.track ? `<br><button class="pill" data-track="${m.track.id}" style="margin-top:6px">▶ Play</button>` : ""}<small>${new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small></div>`);
+    $("chat").lastElementChild.querySelector("[data-track]")?.addEventListener("click", (e) => playTrack(e.currentTarget.dataset.track, e.currentTarget));
+    CHAT.last = m.created_at;
+  }
+  $("chat").scrollTop = $("chat").scrollHeight;
+}
+$("chat-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const body = $("chat-text").value.trim(); if (!body || !CHAT.with) return;
+  $("chat-text").value = "";
+  await fetch("/api/messages", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ to: CHAT.with, body }) });
+  pullChat();
+};
+$("chat-close").onclick = closeChat;
+
+// ── 8. jams: invites, start, join; the jam screen reuses the walk screen
+const J = { on: false, id: null, client: null, role: null, driver: null, people: [], level: 1, climb: 0, lastBpm: 0, lastLevel: 0,
+  viewsHere: 0, place: null, card: null, viewTimer: 0, tempoTimer: 0, inFlight: false, active: null, invites: [] };
+async function pollJams() {
+  if (!ME || ME.admin || J.on) { $("jam-banner").hidden = true; return; }
+  const r = await fetch("/api/jams"); if (!r.ok) return;
+  const { active, invites } = await r.json();
+  J.active = active; J.invites = invites;
+  const inv = invites[0];
+  $("jam-banner").hidden = !(active || inv);
+  if (active) { $("jam-banner-text").textContent = `You are in a jam with @${active.driver?.username ?? "friends"} driving.`; $("jam-banner-go").textContent = "Back to it"; $("jam-banner-go").onclick = () => joinJam(active.id, true); }
+  else if (inv) { $("jam-banner-text").textContent = `@${inv.driver_username} started a jam${inv.listening > 1 ? ` · ${inv.listening} listening` : ""}.`; $("jam-banner-go").textContent = "Join"; $("jam-banner-go").onclick = () => joinJam(inv.id); }
+  if (!$("v-jam").hidden) renderJamView();
+}
+function renderJamView() {
+  $("jam-rejoin").hidden = !J.active;
+  $("invites-panel").hidden = !J.invites.length;
+  $("invites").innerHTML = J.invites.map((j) => `<div class="person"><span class="avatar">${esc(j.driver_username[0])}</span>
+    <span class="who"><b>@${esc(j.driver_username)}</b><small>started ${ago(j.started_at)}${j.listening > 1 ? ` · ${j.listening} listening` : ""}</small></span>
+    <span class="acts"><button class="pill" data-join="${j.id}">Join</button><button class="pill" data-decline="${j.id}" aria-label="Decline">×</button></span></div>`).join("");
+  document.querySelectorAll("[data-join]").forEach((b) => b.onclick = () => joinJam(b.dataset.join));
+  document.querySelectorAll("[data-decline]").forEach((b) => b.onclick = async () => { await fetch(`/api/jams/${b.dataset.decline}/leave`, { method: "POST" }); pollJams(); });
+}
+async function loadJamView() {
+  if (ME?.admin) { teamOnly($("jam-pick")); $("jam-start").hidden = true; return; }
+  await Promise.all([loadFriends(), pollJams()]);
+  renderJamView();
+  $("jam-pick").innerHTML = FR.friends.length ? FR.friends.map((p) => `<label class="pick"><input type="checkbox" value="${p.id}">
+    <span><b>${esc(p.name)}</b> <small>@${esc(p.username)} · ${ago(p.last_seen)}</small></span></label>`).join("")
+    : '<p class="muted">Add friends first (Friends, at the top).</p>';
+  // people who are not friends yet cannot be invited: say so, and let incoming requests be accepted right here
+  $("jam-pick").insertAdjacentHTML("beforeend", [
+    ...FR.incoming.map((p) => `<div class="pick" aria-disabled="true"><span><b>${esc(p.name)}</b> <small>@${esc(p.username)} asked to be friends</small></span>
+      <button class="pill" data-accept-jam="${p.friendship}" style="margin-left:auto">Accept</button></div>`),
+    ...FR.outgoing.map((p) => `<div class="pick" aria-disabled="true" style="opacity:.6"><span><b>${esc(p.name)}</b> <small>@${esc(p.username)} · waiting for them to accept your friend request</small></span></div>`)].join(""));
+  $("jam-pick").querySelectorAll("[data-accept-jam]").forEach((b) => b.onclick = async () => { await fetch(`/api/friends/${b.dataset.acceptJam}`, { method: "POST" }); loadJamView(); });
+  $("jam-start").hidden = !FR.friends.length;
+  $("jam-pick").querySelectorAll("input").forEach((i) => i.onchange = () => {
+    const n = $("jam-pick").querySelectorAll("input:checked").length;
+    $("jam-status").textContent = n > 5 ? "A jam is up to 6 people: pick at most 5 friends." : "";
+  });
+}
+$("jam-rejoin").onclick = () => J.active && joinJam(J.active.id, true);
+$("jam-start").onclick = async () => {
+  const ids = [...$("jam-pick").querySelectorAll("input:checked")].map((i) => i.value);
+  if (!ids.length) { $("jam-status").textContent = "Pick at least one friend."; return; }
+  if (ids.length > 5) return;
+  unlockSound(); const perm = askSensorPermission().catch(() => null);   // inside the tap
+  $("jam-status").textContent = "Starting…";
+  const r = await fetch("/api/jams", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ friends: ids }) });
+  const b = await r.json().catch(() => ({}));
+  if (!r.ok) { $("jam-status").textContent = b.error || "Could not start the jam."; return; }
+  $("jam-status").textContent = "";
+  await perm;
+  enterJam(b.jam.id);
+};
+async function joinJam(id, already = false) {
+  unlockSound(); askSensorPermission().catch(() => null);
+  if (!already) {
+    const r = await fetch(`/api/jams/${id}/join`, { method: "POST" });
+    if (!r.ok) { const b = await r.json().catch(() => ({})); $("jam-status").textContent = b.error || "Could not join."; pollJams(); return; }
+  }
+  enterJam(id);
+}
+async function enterJam(id) {
+  if (W.on) stopWalkMode();
+  Object.assign(J, { on: true, id, role: null, driver: null, level: 1, climb: 0, lastBpm: 0, lastLevel: 0, viewsHere: 0, place: null, card: null });
+  $("jam-banner").hidden = true;
+  $("walklive").hidden = false; document.body.style.overflow = "hidden"; document.body.classList.add("live");
+  $("walklive").classList.add("nocam");
+  $("w-stop").hidden = true; $("jam-acts").hidden = false; $("jam-people").hidden = false;
+  $("w-genre").textContent = "Joining the jam…"; $("w-meta").textContent = "Setting the clock against Chroma's…"; $("w-state").textContent = "Jam"; $("w-views").textContent = "";
+  try {
+    const engine = await engineReady;
+    J.client = new JamClient({ jamId: id, me: ME.id, engine, onState: jamState, onEvent: jamEvent });
+    await J.client.start();
+  } catch (e) { $("w-meta").textContent = `Could not join: ${e.message}`; }
+  $("w-sound").hidden = soundOn();
+}
+function jamState(s) {
+  J.people = s.people;
+  $("jam-people").innerHTML = s.people.filter((p) => p.status === "joined" || p.status === "invited").map((p) =>
+    `<span class="chip ${p.id === s.jam.driver?.id ? "driver" : ""} ${p.status !== "joined" || !p.here ? "away" : ""}">${p.id === s.jam.driver?.id ? "📷 " : ""}@${esc(p.username)}${p.status === "invited" ? " · invited" : ""}</span>`).join("");
+  if (s.jam.ended_at) { exitJam(s.jam.end_reason === "driver left" ? "The jam ended: the driver left." : "The jam has ended."); return; }
+  const driverId = s.jam.driver?.id;
+  if (driverId && driverId !== J.driver) { J.driver = driverId; setJamRole(driverId === ME.id ? "driver" : "listener", s.jam.driver); }
+  $("j-end").hidden = J.role !== "driver"; $("j-take").hidden = J.role === "driver";
+  $("w-sound").hidden = soundOn();
+}
+function jamEvent(e) {
+  const d = e.data || {};
+  if (e.type === "view" && d.card) {
+    J.card = d.card;
+    if (J.role !== "driver") { g.palette(d.card.gradient); W.place = lab(d.card.place); W.time = nice(lab(d.card.time || d.card.time_of_day)); }
+  }
+  setTimeout(() => jamHud(d), 80);
+}
+function jamHud(d = {}) {
+  let i = null; try { i = engineWin.chromaLive.now(); } catch {}
+  if (i) { $("w-genre").textContent = nice(i.genre); $("w-meta").textContent = `${i.key} · ${i.bpm} bpm`; }
+  const walk = J.role === "driver" ? (W.sensors?.state ?? {}) : (d.walk ?? {});
+  const kmh = Math.round(walk.kmh ?? (walk.fused ? walk.fused * 3.6 : 0));
+  $("hud").innerHTML = [[nice(W.place || "…")], [W.time || g.state().phase], [`${walk.band || "still"} · ${kmh} km/h`, "hot"], ...(i?.bpm ? [[`${i.bpm} bpm`]] : [])]
+    .map(([t, cls]) => `<span class="chip ${cls || ""}">${t}</span>`).join("");
+}
+async function setJamRole(role, driver) {
+  const was = J.role; J.role = role;
+  clearTimeout(J.viewTimer); clearInterval(J.tempoTimer);
+  $("flip").hidden = role !== "driver";
+  if (role === "driver") {
+    $("w-state").textContent = was ? "You have the camera now" : "You are driving · your camera makes the music";
+    await showCamera();
+    W.sensors?.stop(); W.sensors = startWalk({ video: W.cam ? g.video() : null, onTurn: () => { clearTimeout(J.viewTimer); jamView(); } });
+    jamView();
+    J.tempoTimer = setInterval(jamTempo, 2000);
+  } else {
+    W.sensors?.stop(); W.sensors = null;
+    g.stopCamera(); $("cam").replaceChildren(); $("walklive").classList.add("nocam");
+    if (J.card) g.palette(J.card.gradient);
+    $("w-state").textContent = `Listening · @${driver?.username ?? "a friend"} has the camera`;
+  }
+}
+// the driver: a view every few seconds → everyone (and my own phone) plays it at the shared moment
+async function jamView() {
+  if (!J.on || J.role !== "driver" || J.inFlight) return;
+  J.inFlight = true;
+  try {
+    let card = null;
+    if (W.cam) { try { card = await modelCard(); } catch {} }
+    if (card?.place?.label && (card.place.confidence ?? 0) >= 0.5) { W.place = card.place.label; W.conf = card.place.confidence; }
+    if (card) W.time = nice(lab(card.time || card.time_of_day));
+    if (!card) card = cardFromColours();
+    if (persona()) card.listener = { type: persona() };
+    const place = lab(card.place);
+    J.viewsHere = place === J.place ? J.viewsHere + 1 : 0; J.place = place;
+    const dna = `${J.id}:${place}:${Math.floor(J.viewsHere / 8)}`, walk = walkState();
+    const plan = engineWin.chromaLive.plan(walk, card, dna);
+    const bpm = Math.round(plan?.bpm ?? 100);
+    const ev = await J.client.send("view", { card, bpm, level: J.level, dna, walk: { ...walk, kmh: W.sensors?.state?.kmh ?? 0 } });
+    if (ev) { J.lastBpm = bpm; J.lastLevel = J.level; J.sentCard = card; J.sentDna = dna; J.lastSent = Date.now(); if (ev.data?.grid) J.lastGridSent = Date.now(); }
+  } finally {
+    J.inFlight = false;
+    if (J.on && J.role === "driver") J.viewTimer = setTimeout(jamView, walkState().band !== "still" ? 3500 : 8000);
+  }
+}
+// the driver: every 2 s, the tempo and layers my walk asks for; sent only when they change
+async function jamTempo() {
+  if (!J.on || J.role !== "driver") return;
+  const walk = walkState();
+  if (walk.moving || !walk.sources.length) { if (++J.climb >= 2) { J.level = Math.min(4, J.level + 1); J.climb = 0; } }
+  else if (walk.stillLong) J.level = Math.max(1, J.level - 1);
+  // the tempo of the view everyone is (or is about to be) playing: the last one sent, not the engine's older one
+  // (asking the engine about its current score made the tempo flip between the old and the new genre every 2 s)
+  let plan = null; try { plan = J.sentCard ? engineWin.chromaLive.plan(walk, J.sentCard, J.sentDna) : null; } catch {}
+  if (!plan) { jamHud(); return; }
+  const bpm = Math.round(plan.bpm), now = Date.now();
+  const changed = (Math.abs(bpm - J.lastBpm) >= 3 || J.level !== J.lastLevel) && now - (J.lastSent || 0) >= 4000;
+  const gridDue = now - (J.lastGridSent || 0) >= 4000 && J.client.myGrid();   // keep everyone's beat lined up
+  if (changed || gridDue) {
+    const send = changed ? bpm : J.lastBpm || bpm, level = changed ? J.level : J.lastLevel || J.level;
+    const ev = await J.client.send("tempo", { bpm: send, level, walk: { ...walk, kmh: W.sensors?.state?.kmh ?? 0 } });
+    if (ev) { J.lastBpm = send; J.lastLevel = level; J.lastSent = now; if (ev.data?.grid) J.lastGridSent = now; }
+  }
+  jamHud();
+}
+function exitJam(message) {
+  if (!J.on) return;
+  J.on = false; clearTimeout(J.viewTimer); clearInterval(J.tempoTimer);
+  J.client?.stop(); J.client = null;
+  W.sensors?.stop(); W.sensors = null;
+  g.stopCamera(); g.ambient();
+  $("walklive").hidden = true; document.body.style.overflow = ""; document.body.classList.remove("live");
+  $("w-stop").hidden = false; $("jam-acts").hidden = true; $("jam-people").hidden = true; $("flip").hidden = false;
+  location.hash = "#jam";
+  $("jam-status").textContent = message || "";
+  pollJams();
+}
+$("j-take").onclick = async () => {
+  unlockSound(); const perm = askSensorPermission().catch(() => null);
+  $("j-take").disabled = true;
+  const r = await fetch(`/api/jams/${J.id}/takeover`, { method: "POST" });
+  $("j-take").disabled = false;
+  if (!r.ok) { const b = await r.json().catch(() => ({})); $("w-state").textContent = b.error || "Could not take the camera."; return; }
+  await perm;
+  J.driver = ME.id; setJamRole("driver");          // the server tells the others; my camera starts now
+};
+$("j-leave").onclick = async () => { await fetch(`/api/jams/${J.id}/leave`, { method: "POST" }); exitJam("You left the jam."); };
+$("j-end").onclick = async () => { await fetch(`/api/jams/${J.id}/end`, { method: "POST" }); exitJam("You ended the jam."); };
+
+// ── 9. my music: save tracks (recipe + a small compressed recording), playlists, sharing
+const REC = { photo: null };
+// while a photo's piece plays, record it (about 10 s, compressed) so "Save" keeps exactly what was heard
+function recordPhoto() {
+  $("save-photo").disabled = false; $("save-photo").textContent = "♥ Save";
+  const rec = (async () => { const w = await engineReady; await new Promise((r) => setTimeout(r, 600)); return w.chromaRecord(10); })();
+  REC.photo = rec.catch(() => null);
+}
+async function saveTrack({ card, source, title, audio }) {
+  let info = {};
+  try { info = engineWin?.chromaDescribe?.(card) ?? {}; } catch {}
+  const form = new FormData();
+  form.append("card", JSON.stringify(card));
+  form.append("source", source);
+  form.append("title", title);
+  if (info.genre) form.append("genre", info.genre);
+  if (info.key) form.append("key", info.key);
+  if (info.bpm) form.append("bpm", String(info.bpm));
+  if (audio?.size) { form.append("audio", audio, `track.${audio.type.includes("mp4") ? "m4a" : "webm"}`); form.append("seconds", "10"); }
+  const r = await fetch("/api/tracks", { method: "POST", body: form });
+  const b = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(b.error || `Server said ${r.status}`);
+  return b;
+}
+const titleOf = (card) => `${nice(lab(card.place))} · ${nice(lab(card.time || card.time_of_day))}`.replace(/^\w/, (c) => c.toUpperCase());
+$("save-photo").onclick = async () => {
+  if (!lastCard) return;
+  const b = $("save-photo"); b.disabled = true; b.textContent = "Saving…";
+  try {
+    const audio = REC.photo ? await REC.photo : null;
+    const out = await saveTrack({ card: lastCard, source: "photo", title: titleOf(lastCard), audio });
+    b.textContent = `♥ Saved${out.bytes ? ` · ${Math.round(out.bytes / 1024)} KB` : ""}`;
+  } catch (e) { b.disabled = false; b.textContent = "♥ Save"; setStatus(`Could not save: ${e.message}`, true); }
+};
+// walking or jamming: record the next 10 s of what is playing, with the view that plays now
+$("w-save").onclick = async () => {
+  const card = J.on ? J.card : W.lastCard;
+  const b = $("w-save");
+  if (!card) { b.textContent = "Wait for the first view…"; setTimeout(() => (b.textContent = "♥ Save the next 10 s"), 2000); return; }
+  b.disabled = true; b.textContent = "Recording 10 s…";
+  try {
+    const audio = await engineWin.chromaRecord(10);
+    b.textContent = "Saving…";
+    const out = await saveTrack({ card, source: J.on ? "jam" : "walk", title: titleOf(card), audio });
+    b.textContent = `♥ Saved · ${Math.round(out.bytes / 1024)} KB`;
+  } catch (e) { b.textContent = `Could not save: ${e.message}`; }
+  setTimeout(() => { b.disabled = false; b.textContent = "♥ Save the next 10 s"; }, 2500);
+};
+
+const MUSIC = { tracks: [], mine: [], shared: [], open: null };
+const player = $("player");
+// play a saved track: its small recording if it has one, else make the music again from its recipe
+async function playTrack(id, btn) {
+  unlockSound();
+  try { engineWin?.chromaStop(); } catch {}
+  stopSimple();
+  const t = MUSIC.tracks.find((x) => x.id === id) ?? await fetch(`/api/tracks/${id}`).then((r) => (r.ok ? r.json() : null));
+  if (!t) return;
+  if (t.has_audio) { player.src = `/api/tracks/${id}/audio`; await player.play().catch(() => {}); }
+  else if (t.card) { player.pause(); playCard(t.card); }
+  if (btn) { const old = btn.textContent; btn.textContent = "♪ Playing"; setTimeout(() => (btn.textContent = old), 3000); }
+}
+async function loadMusic() {
+  if (ME?.admin) { teamOnly($("tracks")); $("playlists").innerHTML = ""; return; }
+  const [tr, pl] = await Promise.all([
+    fetch("/api/tracks").then((r) => (r.ok ? r.json() : [])),
+    fetch("/api/playlists").then((r) => (r.ok ? r.json() : { mine: [], shared: [] }))]);
+  if (!FR.friends.length) await loadFriends();
+  MUSIC.tracks = tr; MUSIC.mine = pl.mine; MUSIC.shared = pl.shared;
+  const friendOpts = FR.friends.map((f) => `<option value="${f.id}">@${esc(f.username)}</option>`).join("");
+  const plOpts = MUSIC.mine.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
+  $("tracks").innerHTML = tr.length ? tr.map((t) => `
+    <div class="person" style="grid-template-columns:40px minmax(0,1fr)">
+      <span class="avatar">${t.source === "jam" ? "⁂" : t.source === "walk" ? "◎" : "✦"}</span>
+      <span class="who"><b>${esc(t.title)}</b><small>${esc(nice(t.genre || ""))}${t.key ? ` · ${esc(t.key)}` : ""}${t.bpm ? ` · ${t.bpm} bpm` : ""} · ${t.source} · ${ago(t.created_at)}</small></span>
+      <span class="acts" style="grid-column:1/-1;flex-wrap:wrap">
+        <button class="pill" data-play="${t.id}">▶ Play</button>
+        ${t.has_audio ? `<a class="pill" href="/api/tracks/${t.id}/audio?download=1">⤓ File</a>` : ""}
+        ${FR.friends.length ? `<select class="pill" data-send="${t.id}" aria-label="Send to a friend"><option value="">Send to…</option>${friendOpts}</select>` : ""}
+        ${MUSIC.mine.length ? `<select class="pill" data-add-to="${t.id}" aria-label="Add to a playlist"><option value="">Add to playlist…</option>${plOpts}</select>` : ""}
+        <button class="pill" data-del="${t.id}" aria-label="Delete this track">×</button>
+      </span>
+    </div>`).join("") : '<p class="muted">No tracks yet. Read a photo and tap ♥ Save, or tap ♥ while you walk or jam.</p>';
+  $("playlists").innerHTML = MUSIC.mine.length ? MUSIC.mine.map((p) => `<div class="person" style="grid-template-columns:40px minmax(0,1fr) auto">
+      <span class="avatar">♫</span><span class="who"><b>${esc(p.name)}</b><small>${p.tracks} track${p.tracks === 1 ? "" : "s"}${p.shared_with ? ` · shared with ${p.shared_with}` : ""}</small></span>
+      <span class="acts"><button class="pill" data-open="${p.id}">Open</button><button class="pill" data-pldel="${p.id}" aria-label="Delete this playlist">×</button></span></div>`).join("")
+    : '<p class="muted">No playlists yet. Name one above.</p>';
+  $("shared-panel").hidden = !MUSIC.shared.length;
+  $("shared-playlists").innerHTML = MUSIC.shared.map((p) => `<div class="person"><span class="avatar">♫</span>
+      <span class="who"><b>${esc(p.name)}</b><small>from @${esc(p.owner)} · ${p.tracks} track${p.tracks === 1 ? "" : "s"}</small></span>
+      <span class="acts"><button class="pill" data-open="${p.id}">Open</button></span></div>`).join("");
+  $("v-music").querySelectorAll("[data-play]").forEach((b) => b.onclick = () => playTrack(b.dataset.play, b));
+  $("v-music").querySelectorAll("[data-del]").forEach((b) => b.onclick = async () => { await fetch(`/api/tracks/${b.dataset.del}`, { method: "DELETE" }); loadMusic(); });
+  $("v-music").querySelectorAll("[data-send]").forEach((sel) => sel.onchange = async () => {
+    if (!sel.value) return;
+    const r = await fetch("/api/messages", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ to: sel.value, track_id: sel.dataset.send }) });
+    $("music-status").textContent = r.ok ? `Sent to @${FR.friends.find((f) => f.id === sel.value)?.username}. They find it in your chat.` : "Could not send it.";
+    sel.value = "";
+  });
+  $("v-music").querySelectorAll("[data-add-to]").forEach((sel) => sel.onchange = async () => {
+    if (!sel.value) return;
+    const r = await fetch(`/api/playlists/${sel.value}/tracks`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ track_id: sel.dataset.addTo }) });
+    $("music-status").textContent = r.ok ? `Added to “${MUSIC.mine.find((p) => p.id === sel.value)?.name}”.` : "Could not add it.";
+    sel.value = ""; loadMusic();
+  });
+  $("v-music").querySelectorAll("[data-open]").forEach((b) => b.onclick = () => openPlaylist(b.dataset.open));
+  $("v-music").querySelectorAll("[data-pldel]").forEach((b) => b.onclick = async () => { await fetch(`/api/playlists/${b.dataset.pldel}`, { method: "DELETE" }); $("pl-open").hidden = true; loadMusic(); });
+}
+$("pl-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const name = $("pl-name").value.trim(); if (!name) return;
+  const r = await fetch("/api/playlists", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) });
+  if (r.ok) $("pl-name").value = "";
+  loadMusic();
+};
+async function openPlaylist(id) {
+  const r = await fetch(`/api/playlists/${id}`); if (!r.ok) return;
+  const p = await r.json(); MUSIC.open = p;
+  for (const t of p.tracks) if (!MUSIC.tracks.find((x) => x.id === t.id)) MUSIC.tracks.push(t);
+  $("pl-open").hidden = false; $("pl-title").textContent = p.name;
+  $("pl-meta").textContent = `${p.tracks.length} track${p.tracks.length === 1 ? "" : "s"}${p.mine ? "" : ` · shared by @${p.owner}`}`;
+  $("pl-tracks").innerHTML = p.tracks.length ? p.tracks.map((t, i) => `<div class="person" style="grid-template-columns:40px minmax(0,1fr) auto">
+      <span class="avatar">${i + 1}</span><span class="who"><b>${esc(t.title)}</b><small>${esc(nice(t.genre || ""))}${t.bpm ? ` · ${t.bpm} bpm` : ""}</small></span>
+      <span class="acts"><button class="pill" data-play="${t.id}">▶</button>${p.mine ? `<button class="pill" data-out="${t.id}" aria-label="Take out of the playlist">×</button>` : ""}</span></div>`).join("")
+    : '<p class="muted">Empty. Add tracks from “My tracks”.</p>';
+  $("pl-tracks").querySelectorAll("[data-play]").forEach((b) => b.onclick = () => playTrack(b.dataset.play, b));
+  $("pl-tracks").querySelectorAll("[data-out]").forEach((b) => b.onclick = async () => { await fetch(`/api/playlists/${p.id}/tracks?track=${b.dataset.out}`, { method: "DELETE" }); openPlaylist(p.id); loadMusic(); });
+  $("pl-share-box").hidden = !p.mine;
+  if (p.mine) {
+    const on = new Set((p.shared_with || []).map((u) => u.id));
+    $("pl-share").innerHTML = FR.friends.length ? FR.friends.map((f) => `<label class="pick"><input type="checkbox" value="${f.id}" ${on.has(f.id) ? "checked" : ""}><span><b>${esc(f.name)}</b> <small>@${esc(f.username)}</small></span></label>`).join("")
+      : '<p class="muted">Add friends first to share.</p>';
+  }
+  $("pl-open").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+$("pl-close").onclick = () => { $("pl-open").hidden = true; };
+$("pl-share-save").onclick = async () => {
+  const ids = [...$("pl-share").querySelectorAll("input:checked")].map((i) => i.value);
+  if (ids.length > 10) { $("music-status").textContent = "Share with up to 10 friends."; return; }
+  const r = await fetch(`/api/playlists/${MUSIC.open.id}/share`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ friends: ids }) });
+  const b = await r.json().catch(() => ({}));
+  $("music-status").textContent = r.ok ? (ids.length ? `Shared with ${ids.length} friend${ids.length === 1 ? "" : "s"}.` : "Not shared with anyone now.") : b.error || "Could not share.";
+  loadMusic();
+};
+// play all: one track after the other (recordings back to back; recipes about 10 s each)
+$("pl-playall").onclick = async () => {
+  const list = MUSIC.open?.tracks || []; if (!list.length) return;
+  unlockSound();
+  let i = 0;
+  const next = async () => {
+    if (i >= list.length || $("pl-open").hidden) return;
+    const t = list[i++];
+    await playTrack(t.id);
+    if (t.has_audio) player.onended = next; else { player.onended = null; setTimeout(next, 10500); }
+  };
+  next();
+};
+
+// check for invites and new messages now and then
+await loadMe();
+pollJams(); loadFriends();
+setInterval(pollJams, 8000);
+setInterval(() => { if ($("v-friends").hidden) loadFriends(); }, 20000);
+
+route();
 </script>
 </body>
 </html>

@@ -14,8 +14,8 @@ tempo, the layers build up while you walk, and a corner brings a new view. Every
 **Step 01, one photo**: upload a photo and hear 10 seconds made from its card. The small photo and its card are
 stored together in one D1 row (`scenes`), so "My places" is still there after a reload.
 
-The live player is built from `music/src` (no changes to Bo's code):
-`cd music && VITE_MODEL_URL="" npx vite build --base ./ --outDir ../03_app/public/live`.
+The live player is built from `Bo/src` (no changes to Bo's code):
+`VITE_MODEL_URL="" npx vite build --base ./ --outDir "../Akshat - Image processing/03_app/public/live"`.
 With an empty model URL it calls `/gradio_api/call/predict` on our own app, which checks the login and passes
 the frame on to Render.
 
@@ -56,8 +56,8 @@ Local test: copy `.dev.vars.example` to `.dev.vars`, then `npm run db:local` and
 
 ## Diagrams
 
-The final diagrams are in [`../04_final/diagrams/`](../04_final/diagrams/) (system, user flow, sequence); Tuesday's design is on Miro.
-Tuesday design: Miro board https://miro.com/app/board/uXjVENa00Hk=/ (section "Hand-in · Chroma (team 8)").
+`diagrams/` (also on Miro): two user stories, the system diagram, two sequence diagrams.
+Source: [`../HANDIN.md`](../HANDIN.md).
 
 ## Compare: diagrams vs the app we built
 
@@ -67,3 +67,35 @@ Tuesday design: Miro board https://miro.com/app/board/uXjVENa00Hk=/ (section "Ha
 - **Wake-up is two loops:** the sequence diagram shows one retry; in the code the server retries first (`_lib/model.js`), then the page retries on 503.
 - **Extra arrow:** `/api/wake` (page → Function → Render on page load) was not in the first diagram; it is added now.
 - **Same as designed:** password check in `_middleware.js` before every `/api/` route, Render called only from server code.
+
+## Team dashboard (/admin)
+
+https://chroma-jam.pages.dev/admin shows how many people joined, who is active, sign-ups per day, what they did
+(photos, walk views, jams, friends) and the last login attempts. It refreshes every 30 s and can download the user list as CSV.
+Emails are masked; password hashes are never sent.
+
+**Where they are:** the number of countries, and one card per country with its users, its local time now and that
+place's sky right now (the real sun height, the same formula as the app's living gradient).
+Country, time zone and a rough area (whole degrees, ~100 km) come from Cloudflare's `request.cf`: no GPS, no permission,
+no IP address stored. They are saved on sign-up, login and at most once a minute while someone uses the app, so older
+accounts fill in on their next visit. Needs `migrations/0003_country_timezone.sql` on the database **before** deploying.
+
+Only Akshat (@aksster), Bo (@boderoeck) and Bhavini (@bhavini) can open it: `ADMINS` in `wrangler.toml` and
+`scripts/deploy-chroma-jam.sh`. Everyone else (the shared team login too) gets "Team only".
+Code: `functions/api/admin/stats.js`, `public/admin.html`.
+
+## The sky is the visitor's own
+
+The page's living gradient used Barcelona whenever a visitor had not allowed GPS. Now `/api/me` also returns
+roughly where the request comes from (Cloudflare, city level, not stored), and the sky, weather and caption use that city.
+GPS still wins when allowed; Barcelona is only the last resort, and the caption then says "Barcelona (default)".
+
+## Keeping the model awake (keepwarm/)
+
+Render's free plan puts the model to sleep after 15 minutes without requests; the next photo then waits about a minute.
+`keepwarm/` is a tiny Cloudflare Worker that opens the model page every 10 minutes, so it never sleeps.
+Free Render gives 750 hours a month; one service awake all month is about 720, so it fits.
+
+```bash
+cd keepwarm && npx --prefix .. wrangler deploy
+```

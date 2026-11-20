@@ -115,7 +115,7 @@ To rebuild the photo data, follow [`01_autoencoder/data_prep/README.md`](01_auto
 |---|---|
 | Model (Hugging Face) | https://huggingface.co/iaac-maai/hackathon-team8-chroma-ae |
 | Model server (Render) | https://team8-chroma-model.onrender.com |
-| App (Cloudflare Pages) | https://chroma-team8.pages.dev (live walk at `/live/chroma`; password sent with the hand-in) |
+| App (Cloudflare Pages) | https://chroma-jam.pages.dev (make an account; photo, walk, friends, chat, jams, saved tracks and playlists) |
 
 ## Data and licences
 

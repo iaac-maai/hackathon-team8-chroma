@@ -1,16 +1,22 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7e4e8">
 <title>Chroma · how you listen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Inter:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/style.css">
 </head>
-<body><main>
-  <div class="kick"><a href="/">← Chroma</a></div>
-  <h1>How do you listen?</h1>
-  <p>The place still picks the genre and key. Your type shifts the tempo, chords, drums and sound inside it.
-     The next photo or live walk plays with your new type.</p>
-  <form class="card" method="post" action="/api/persona">
+<body>
+<canvas class="field" id="field" aria-hidden="true"></canvas><div class="grain" id="grain" aria-hidden="true"></div>
+<main>
+  <div class="top"><a class="brand" href="/">← Chroma</a><a class="pill" href="/api/logout">Log out</a></div>
+  <section class="panel hero">
+    <h1>How do you listen?</h1>
+    <p class="muted">The place still picks the genre and key. Your type shifts the tempo, chords, drums and sound inside it. Your next photo or walk plays with the new type.</p>
+  </section>
+  <form class="panel" method="post" action="/api/persona">
     <fieldset class="personas">
       <legend>Your type now: <b id="now">no type</b></legend>
       <label class="persona"><input type="radio" name="persona" value="mellow"><b>Mellow</b><span>calm, dreamy, soft</span></label>
@@ -18,13 +24,15 @@
       <label class="persona"><input type="radio" name="persona" value="sophisticated"><b>Sophisticated</b><span>curious, rich chords, surprises</span></label>
       <label class="persona"><input type="radio" name="persona" value="intense"><b>Intense</b><span>loud, fast, powerful</span></label>
       <label class="persona"><input type="radio" name="persona" value="contemporary"><b>Contemporary</b><span>rhythmic, danceable, beats</span></label>
-      <label class="persona none"><input type="radio" name="persona" value=""><b>No type</b><span>just the place</span></label>
+      <label class="persona"><input type="radio" name="persona" value=""><b>No type</b><span>just the place</span></label>
     </fieldset>
-    <div class="row"><button class="primary">Save</button></div>
+    <button class="cta" type="submit">Save</button>
   </form>
 </main>
-<script>
-  // The persona cookie is readable on purpose (Bo's player reads it too)
+<script type="module">
+  import { livingGradient } from "/chroma-gradient.js";
+  livingGradient({ canvas: document.getElementById("field"), grain: document.getElementById("grain") }).ambient();
+  // the persona cookie is readable on purpose (Bo's player reads it too)
   const now = document.cookie.match(/(?:^|;\s*)persona=([a-z]+)/)?.[1] || "";
   const box = document.querySelector(`input[name=persona][value="${now}"]`) || document.querySelector('input[name=persona][value=""]');
   box.checked = true;

@@ -1,5 +1,5 @@
 // Photo + place → how the music should feel, on the two axes from music psychology
-// (Akshat's research note on music psychology; sources in music/ENGINE.md):
+// (Akshat's research note, `Akshat - Image processing/MUSIC_RESEARCH.md`):
 //
 //   pleasantness (valence) 0 … 1   unpleasant → pleasant
 //   energy       (arousal) 0 … 1   calm → excited

@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Chroma · team dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%227%22 fill=%22%232a78d6%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+/* One page, two homes: this file is the team dashboard site (admin_site) and the app's /admin page.
+   Colours are roles, so light and dark swap in one place. Chart colours were checked with the colour-blindness validator. */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,.10);
+  --s1: #2a78d6; --s1-wash: rgba(42,120,214,.10); --bad: #d03b3b; --good: #0ca30c;
+  --land: #e7e6e0; --sea: #f3f6fa; --night: rgba(13,54,107,.16);
+  --sans: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,.10);
+    --s1: #3987e5; --s1-wash: rgba(57,135,229,.14); --land: #3a3a37; --sea: #202020; --night: rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,.10);
+  --s1: #3987e5; --s1-wash: rgba(57,135,229,.14); --land: #3a3a37; --sea: #202020; --night: rgba(0,0,0,.55);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 var(--sans); }
+main { max-width: 1180px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+header h1 { font-size: 20px; font-weight: 600; margin: 0 auto 0 0; letter-spacing: -.01em; }
+header h1 span { color: var(--muted); font-weight: 400; }
+.btn { font: inherit; font-size: 13px; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; text-decoration: none; cursor: pointer; }
+.muted { color: var(--muted); font-size: 12px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; min-width: 0; }
+.card h2 { font-size: 14px; font-weight: 600; margin: 0 0 2px; }
+.card .sub { color: var(--ink-2); font-size: 12px; margin: 0 0 12px; }
+.grid { display: grid; gap: 16px; }
+.g-4 { grid-template-columns: 1.4fr 1fr 1fr 1fr; }
+.g-2 { grid-template-columns: 1.6fr 1fr; }
+.g-2b { grid-template-columns: 1fr 1fr; }
+@media (max-width: 900px) { .g-4 { grid-template-columns: 1fr 1fr; } .g-2, .g-2b { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .g-4 { grid-template-columns: 1fr; } }
+
+/* stat tiles */
+.tile .label { color: var(--ink-2); font-size: 13px; }
+.tile .value { font-size: 34px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; margin-top: 4px; }
+.tile.hero .value { font-size: 56px; }
+.tile .note { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--good); margin-right: 6px; box-shadow: 0 0 0 0 rgba(12,163,12,.5); animation: pulse 2s infinite; vertical-align: 1px; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 6px rgba(12,163,12,0); } 100% { box-shadow: 0 0 0 0 rgba(12,163,12,0); } }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+
+/* charts */
+svg { display: block; width: 100%; overflow: visible; }
+svg text { fill: var(--muted); font: 11px var(--sans); }
+svg .val { fill: var(--ink); font-weight: 600; font-size: 12px; }
+svg .lab { fill: var(--ink-2); font-size: 12px; }
+.hit { fill: transparent; cursor: default; }
+.hit:hover + .mark, .mark:hover { opacity: .85; }
+#tip { position: fixed; z-index: 10; pointer-events: none; background: var(--ink); color: var(--surface); font-size: 12px; line-height: 1.4;
+  padding: 7px 10px; border-radius: 8px; max-width: 260px; opacity: 0; transition: opacity .1s; }
+#tip b { font-weight: 600; }
+
+/* map */
+.map-wrap { position: relative; }
+.map-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; color: var(--ink-2); font-size: 12px; }
+.key { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--s1); margin-right: 5px; vertical-align: -1px; box-shadow: 0 0 0 2px var(--surface); }
+.key.night { border-radius: 2px; background: var(--night); box-shadow: inset 0 0 0 1px var(--border); }
+
+/* segmented bar (logins) */
+.seg { display: flex; gap: 2px; height: 28px; }
+.seg div { border-radius: 4px; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; padding: 0 8px; white-space: nowrap; min-width: 0; overflow: visible; }
+.seg-legend { display: flex; gap: 16px; margin-top: 10px; color: var(--ink-2); font-size: 12px; flex-wrap: wrap; }
+.seg-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+/* local skies */
+.places { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.place { border-radius: 12px; padding: 12px 14px; color: #fff; display: grid; gap: 2px; position: relative; min-height: 110px; }
+.place.light { color: #0b0b0b; }
+.place .flag { font-size: 20px; line-height: 1; }
+.place b { font-size: 15px; font-weight: 600; }
+.place .clock { font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
+.place .meta { font-size: 11px; opacity: .85; }
+.place .count { position: absolute; top: 10px; right: 12px; font-size: 22px; font-weight: 600; text-align: right; line-height: 1; }
+.place .count small { display: block; font-size: 10px; font-weight: 500; opacity: .8; }
+
+/* table */
+.bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.bar input { font: inherit; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--page); color: var(--ink); flex: 1; max-width: 280px; min-width: 0; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { font-weight: 500; color: var(--ink-2); cursor: pointer; user-select: none; }
+td.num, th.num { text-align: right; }
+.bad-text { color: var(--bad); }
+.notice { color: var(--ink-2); font-size: 12px; background: var(--s1-wash); border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Chroma <span>· who uses it</span></h1>
+    <span class="muted" id="updated">Loading…</span>
+    <a class="btn" href="https://chroma-jam.pages.dev">Open the app</a>
+    <a class="btn" id="logout" href="/logout">Log out</a>
+  </header>
+
+  <p class="card" id="denied" hidden>This page is only for the Chroma team (Akshat, Bhavini and Bo). Log in with your own account.</p>
+  <p class="card" id="failed" hidden></p>
+
+  <div id="dash" class="grid" hidden>
+    <!-- headline numbers -->
+    <section class="grid g-4">
+      <div class="card tile hero">
+        <div class="label">People with an account</div>
+        <div class="value" id="t-users">–</div>
+        <div id="spark" aria-hidden="true"></div>
+        <div class="note" id="t-users-note"></div>
+      </div>
+      <div class="card tile">
+        <div class="label"><span class="live-dot" aria-hidden="true"></span>Active in the last hour</div>
+        <div class="value" id="t-act1">–</div>
+        <div class="note" id="t-act24"></div>
+      </div>
+      <div class="card tile">
+        <div class="label">Joined this week</div>
+        <div class="value" id="t-new7">–</div>
+        <div class="note" id="t-new24"></div>
+      </div>
+      <div class="card tile">
+        <div class="label">Countries</div>
+        <div class="value" id="t-countries">–</div>
+        <div class="note" id="t-countries-note"></div>
+      </div>
+    </section>
+
+    <!-- map + countries -->
+    <section class="grid g-2">
+      <div class="card">
+        <h2>Where they are, right now</h2>
+        <p class="sub">One dot per country, bigger for more people. The shaded part of the world is in night at this moment.</p>
+        <div class="map-wrap" id="map"></div>
+        <div class="map-legend"><span><i class="key"></i>people in that country</span><span><i class="key night"></i>night now</span></div>
+        <p class="notice" id="nogeo" hidden>Countries are not tracked yet on chroma-jam: Bhavini still has to run migration 0003 and deploy (task 1b). Everyone counts as “not known yet” until then.</p>
+      </div>
+      <div class="card">
+        <h2>People per country</h2>
+        <p class="sub">Country from Cloudflare, not GPS. “Not known yet” = no visit since tracking started.</p>
+        <div id="countries"></div>
+      </div>
+    </section>
+
+    <!-- sign-ups + what they do -->
+    <section class="grid g-2b">
+      <div class="card">
+        <h2>New accounts per day</h2>
+        <p class="sub" id="signups-sub">Last 14 days (UTC)</p>
+        <div id="signups"></div>
+      </div>
+      <div class="card">
+        <h2>How far people get</h2>
+        <p class="sub">Of everyone with an account, how many have done each thing at least once.</p>
+        <div id="funnel"></div>
+      </div>
+    </section>
+
+    <!-- local skies + activity totals + logins -->
+    <section class="grid g-2">
+      <div class="card">
+        <h2>Their time and sky now</h2>
+        <p class="sub">Each card is that country's sky at its local time (real sun height).</p>
+        <div class="places" id="places"></div>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h2>Logins in the last 24 hours</h2>
+          <p class="sub" id="logins-sub"></p>
+          <div class="seg" id="seg" role="img"></div>
+          <div class="seg-legend"><span><i style="background:var(--s1)"></i>Logged in</span><span><i style="background:var(--bad)"></i>✕ Wrong password</span></div>
+        </div>
+        <div class="card">
+          <h2>Everything made in Chroma</h2>
+          <p class="sub">All time, all users.</p>
+          <div id="made"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- the table view: every number above, per person -->
+    <section class="card">
+      <div class="bar">
+        <h2 style="margin:0 auto 0 0">Everyone</h2>
+        <input id="q" type="search" placeholder="Search username or name" aria-label="Search users">
+        <button class="btn" id="csv" type="button">Download CSV</button>
+      </div>
+      <div class="tablewrap"><table>
+        <thead><tr>
+          <th data-k="username">Username</th><th data-k="name">Name</th><th data-k="email">Email</th><th data-k="country">Country</th>
+          <th data-k="created_at">Joined</th><th data-k="last_seen">Last seen</th>
+          <th class="num" data-k="login_count">Logins</th><th class="num" data-k="photos">Photos</th>
+          <th class="num" data-k="walk_views">Walk views</th><th class="num" data-k="jams">Jams</th><th class="num" data-k="friends">Friends</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+      <p class="muted">Emails are masked. Passwords are never stored, only a hash, and never sent here.</p>
+    </section>
+
+    <section class="card">
+      <h2>Last 20 login attempts</h2>
+      <div class="tablewrap"><table><thead><tr><th>When</th><th>Who</th><th>From</th><th>Result</th></tr></thead><tbody id="logins"></tbody></table></div>
+    </section>
+  </div>
+</main>
+<div id="tip" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script>
+// Where the numbers come from: the app's /admin page asks /api/admin/stats, the dashboard site asks /api/stats.
+const IN_APP = location.pathname.startsWith("/admin");
+const API = IN_APP ? "/api/admin/stats" : "/api/stats";
+if (IN_APP) document.getElementById("logout").href = "/api/logout";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = (n) => Number(n || 0).toLocaleString("en");
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const when = (iso) => {
+  if (!iso) return "–";
+  const s = (Date.now() - Date.parse(iso)) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  return new Date(iso).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+};
+const flag = (cc) => (/^[A-Z]{2}$/.test(cc || "") ? String.fromCodePoint(...[...cc].map((c) => 0x1f1a5 + c.charCodeAt(0))) : "🌐");
+const names = (() => { try { return new Intl.DisplayNames(["en"], { type: "region" }); } catch { return null; } })();
+const countryName = (cc) => (!cc || cc === "??" ? "Not known yet" : names?.of(cc) || cc);
+let data = null, land = null, sortKey = "created_at", sortDir = -1;
+
+// ── tooltip: any element with data-tip
+const tip = $("tip");
+document.addEventListener("pointermove", (e) => {
+  const t = e.target.closest?.("[data-tip]");
+  if (!t) { tip.style.opacity = 0; return; }
+  tip.innerHTML = t.dataset.tip; tip.style.opacity = 1;
+  const x = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 14), y = Math.max(8, e.clientY - tip.offsetHeight - 12);
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+});
+
+// ── the sun (the app's formula, chroma-gradient.js): height at a place, and where it is overhead now
+function sunParts(d = new Date()) {
+  const day = (Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - Date.UTC(d.getUTCFullYear(), 0, 0)) / 864e5;
+  const hour = d.getUTCHours() + d.getUTCMinutes() / 60, g = (2 * Math.PI / 365) * (day - 1 + (hour - 12) / 24);
+  const decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  const eqt = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  return { decl, eqt, hour };
+}
+function sunElevation(lat, lon, d = new Date()) {
+  const { decl, eqt, hour } = sunParts(d), rad = Math.PI / 180;
+  const ha = ((hour * 60 + eqt + 4 * lon) / 4 - 180) * rad;
+  const cosZ = Math.sin(lat * rad) * Math.sin(decl) + Math.cos(lat * rad) * Math.cos(decl) * Math.cos(ha);
+  return 90 - Math.acos(Math.min(1, Math.max(-1, cosZ))) / rad;
+}
+function localNow(tz) {
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+    return { h: Number(p.hour) + Number(p.minute) / 60, text: `${p.hour}:${p.minute}` };
+  } catch { return null; }
+}
+// sky colours for the place cards (the app's living-gradient phases)
+function sky(c) {
+  const tz = c.timezones?.[0], t = tz ? localNow(tz) : null;
+  if (!t) return null;
+  let e;
+  if (c.lat != null && c.lon != null) e = sunElevation(c.lat, c.lon);
+  else e = 60 * Math.cos(((t.h - 13) / 12) * Math.PI) - 10;  // no area: rough guess from the clock
+  const rising = t.h < 12;
+  const s = e < -6 ? ["night", "#0b1030", "#3a2f6b"] : e < 0 ? (rising ? ["blue hour", "#1f2a6b", "#c77dbb"] : ["dusk", "#5b5fb0", "#ff9f80"])
+    : e < 10 ? (rising ? ["sunrise", "#ff9a52", "#ffd08a", 1] : ["golden hour", "#ff7a3d", "#ffe2c4", 1])
+    : e < 30 ? [rising ? "morning" : "afternoon", "#7ec8ff", "#fff1d6", 1] : ["day", "#9fd7ff", "#f2f7ff", 1];
+  return { t, tz, label: s[0], bg: `linear-gradient(170deg, ${s[1]}, ${s[2]})`, light: !!s[3] };
+}
+
+// ── charts (plain SVG). Bars ≤ 24 px, 4 px rounded data end, square at the baseline; hairline grid.
+function niceMax(v) { if (v <= 4) return 4; const p = 10 ** Math.floor(Math.log10(v)); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p; return v; }
+function colPath(x, y, w, h, r = 4) { // rounded top, square bottom
+  if (h <= 0) return "";
+  r = Math.min(r, h, w / 2);
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+function barPath(x, y, w, h, r = 4) { // rounded right end, square at the left baseline
+  if (w <= 0) return "";
+  r = Math.min(r, w, h / 2);
+  return `M${x},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h - r}Q${x + w},${y + h} ${x + w - r},${y + h}H${x}Z`;
+}
+
+function drawSignups() {
+  const el = $("signups"), W = el.clientWidth || 500, H = 200, padL = 28, padB = 22, padT = 18;
+  const days = [];
+  for (let i = 13; i >= 0; i--) days.push(new Date(Date.now() - i * 864e5).toISOString().slice(0, 10));
+  const by = Object.fromEntries(data.signups_by_day.map((d) => [d.day, d.n]));
+  const vals = days.map((d) => by[d] || 0), total = vals.reduce((a, b) => a + b, 0);
+  const max = niceMax(Math.max(...vals)), ih = H - padB - padT, slot = (W - padL) / days.length, bw = Math.min(24, slot * .62);
+  const ticks = [0, max / 2, max];
+  const peak = vals.indexOf(Math.max(...vals));
+  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="New accounts per day, last 14 days, ${total} in total">`;
+  for (const t of ticks) { const y = padT + ih - (t / max) * ih; s += `<line x1="${padL}" x2="${W}" y1="${y}" y2="${y}" stroke="${t ? "var(--grid)" : "var(--axis)"}" stroke-width="1"/><text x="${padL - 6}" y="${y + 4}" text-anchor="end">${fmt(t)}</text>`; }
+  days.forEach((d, i) => {
+    const v = vals[i], h = (v / max) * ih, x = padL + slot * i + (slot - bw) / 2, y = padT + ih - h;
+    const date = new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+    s += `<rect class="hit" x="${padL + slot * i}" y="${padT}" width="${slot}" height="${ih}" data-tip="<b>${date}</b><br>${v} new account${v === 1 ? "" : "s"}"/>`;
+    s += `<path class="mark" d="${colPath(x, y, bw, h)}" fill="var(--s1)" pointer-events="none"/>`;
+    if (i === peak && v > 0) s += `<text class="val" x="${x + bw / 2}" y="${y - 6}" text-anchor="middle">${v}</text>`;
+    if (i % 2 === 1 || i === 13) s += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${d.slice(8)}/${d.slice(5, 7)}</text>`;
+  });
+  el.innerHTML = s + "</svg>";
+  $("signups-sub").textContent = `Last 14 days (UTC) · ${total} new account${total === 1 ? "" : "s"}`;
+}
+
+function hbars(el, rows, { label = (r) => r.label, sub = null, unit = "people", total = null } = {}) {
+  // horizontal bars, one series, value at the tip. rows: [{label, value, tip}]
+  const W = el.clientWidth || 400, labW = Math.min(150, W * .38), rowH = 34, H = rows.length * rowH + 4;
+  const max = Math.max(1, ...rows.map((r) => r.value)), iw = W - labW - 64;
+  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img">`;
+  s += `<line x1="${labW}" x2="${labW}" y1="0" y2="${H}" stroke="var(--axis)" stroke-width="1"/>`;
+  rows.forEach((r, i) => {
+    const y = i * rowH + 7, w = (r.value / max) * iw, pct = total ? ` · ${Math.round((r.value / Math.max(1, total)) * 100)}%` : "";
+    s += `<rect class="hit" x="0" y="${i * rowH}" width="${W}" height="${rowH}" data-tip="${esc(r.tip || `<b>${esc(label(r))}</b><br>${fmt(r.value)} ${unit}${pct}`)}"/>`;
+    s += `<text class="lab" x="${labW - 10}" y="${y + 14}" text-anchor="end" pointer-events="none">${esc(label(r)).slice(0, 22)}</text>`;
+    s += `<path class="mark" d="${barPath(labW, y, Math.max(w, r.value ? 3 : 0), 20)}" fill="var(--s1)" pointer-events="none"/>`;
+    s += `<text class="val" x="${labW + Math.max(w, 0) + 8}" y="${y + 14}" pointer-events="none">${fmt(r.value)}<tspan class="muted" style="fill:var(--muted);font-weight:400">${pct}</tspan></text>`;
+  });
+  el.innerHTML = s + "</svg>";
+}
+
+function drawFunnel() {
+  const u = data.users, n = u.length;
+  const step = (label, f) => ({ label, value: u.filter(f).length });
+  hbars($("funnel"), [
+    { label: "Made an account", value: n },
+    step("Read a photo", (x) => x.photos > 0),
+    step("Went on a walk", (x) => x.walk_views > 0),
+    step("Has a friend", (x) => x.friends > 0),
+    step("Joined a jam", (x) => x.jams > 0),
+  ], { total: n });
+}
+
+function drawCountries() {
+  const rows = data.countries.slice(0, 8).map((c) => ({ label: `${flag(c.country)} ${countryName(c.country)}`, value: c.users,
+    tip: `<b>${esc(countryName(c.country))}</b><br>${fmt(c.users)} ${c.users === 1 ? "person" : "people"} · ${fmt(c.active_24h)} active today · ${fmt(c.new_7d)} new this week` }));
+  const rest = data.countries.slice(8).reduce((a, c) => a + c.users, 0);
+  if (rest) rows.push({ label: `Other (${data.countries.length - 8})`, value: rest });
+  if (!rows.length) { $("countries").innerHTML = '<p class="muted">No users yet.</p>'; return; }
+  hbars($("countries"), rows, { total: data.totals.users });
+}
+
+function drawMap() {
+  const el = $("map"), W = el.clientWidth || 700, LAT_N = 84, LAT_S = -58, H = Math.round(W * (LAT_N - LAT_S) / 360);
+  const X = (lon) => ((lon + 180) / 360) * W, Y = (lat) => ((LAT_N - lat) / (LAT_N - LAT_S)) * H;
+  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="World map with users per country and today's night side">`;
+  s += `<rect x="0" y="0" width="${W}" height="${H}" rx="8" fill="var(--sea)"/>`;
+  if (land) {
+    let d = "";
+    for (const poly of land) for (const ring of poly) {
+      let prev = null;
+      ring.forEach(([lon, lat], i) => {
+        const x = X(lon), y = Y(Math.max(LAT_S, Math.min(LAT_N, lat)));
+        d += (i === 0 || (prev && Math.abs(x - prev) > W / 2) ? "M" : "L") + x.toFixed(1) + "," + y.toFixed(1);
+        prev = x;
+      });
+      d += "Z";
+    }
+    s += `<path d="${d}" fill="var(--land)"/>`;
+  }
+  // night side: the line where the sun is on the horizon, then the dark half
+  const { decl, eqt, hour } = sunParts(), rad = Math.PI / 180, subLon = -((hour * 60 + eqt) - 720) / 4;
+  const pts = [];
+  for (let lon = -180; lon <= 180; lon += 2) {
+    const lat = Math.atan(-Math.cos((lon - subLon) * rad) / Math.tan(decl)) / rad;
+    pts.push(`${X(lon).toFixed(1)},${Y(lat).toFixed(1)}`);
+  }
+  const edge = decl < 0 ? -10 : H + 10;
+  s += `<path d="M${X(-180)},${edge}L${pts.join("L")}L${X(180)},${edge}Z" fill="var(--night)" pointer-events="none"/>`;
+  // a dot per country (bigger = more people), with a surface ring
+  const known = data.countries.filter((c) => c.lat != null && c.lon != null && c.country !== "??").sort((a, b) => b.users - a.users);
+  const maxU = Math.max(1, ...known.map((c) => c.users));
+  for (const c of known) {
+    const r = 5 + 13 * Math.sqrt(c.users / maxU), x = X(c.lon), y = Y(c.lat), k = sky(c);
+    const t = `<b>${esc(flag(c.country))} ${esc(countryName(c.country))}</b><br>${fmt(c.users)} ${c.users === 1 ? "person" : "people"}${k ? `<br>${k.t.text} local · ${k.label}` : ""}`;
+    s += `<circle cx="${x}" cy="${y}" r="${r + 6}" class="hit" data-tip="${esc(t)}"/>`;
+    s += `<circle class="mark" cx="${x}" cy="${y}" r="${r}" fill="var(--s1)" fill-opacity=".85" stroke="var(--surface)" stroke-width="2" pointer-events="none"/>`;
+  }
+  // label the biggest one
+  if (known[0]) { const c = known[0], r = 5 + 13; s += `<text class="lab" x="${X(c.lon) + r + 4}" y="${Y(c.lat) + 4}">${esc(countryName(c.country))} · ${fmt(c.users)}</text>`; }
+  el.innerHTML = s + "</svg>";
+}
+
+function drawPlaces() {
+  $("places").innerHTML = data.countries.filter((c) => c.country !== "??").map((c) => {
+    const k = sky(c);
+    return `<div class="place ${!k || k.light ? "light" : ""}" style="background:${k ? k.bg : "linear-gradient(170deg,#c9c3cf,#ece8f0)"}">
+      <span class="count">${fmt(c.users)}<small>${c.users === 1 ? "person" : "people"}</small></span>
+      <span class="flag">${flag(c.country)}</span><b>${esc(countryName(c.country))}</b>
+      <span class="clock">${k ? k.t.text : "–"}</span>
+      <span class="meta">${k ? `${k.label} · ${esc(k.tz.replace(/_/g, " "))}` : "time zone not known"}</span>
+    </div>`;
+  }).join("") || '<p class="muted">No countries known yet.</p>';
+}
+
+function drawLogins() {
+  const ok = data.totals.logins_ok_24h, all = data.totals.logins_24h, bad = all - ok;
+  $("logins-sub").textContent = all ? `${fmt(all)} attempts · ${Math.round((ok / all) * 100)}% got in` : "No logins in the last 24 hours.";
+  const seg = $("seg");
+  seg.setAttribute("aria-label", `${ok} logged in, ${bad} wrong password`);
+  if (!all) { seg.innerHTML = ""; return; }
+  const part = (v, colour, label, text) => v ? `<div style="flex:${v};background:${colour}" data-tip="<b>${label}</b><br>${fmt(v)} · ${Math.round((v / all) * 100)}%">${(v / all) > .12 ? text : ""}</div>` : "";
+  seg.innerHTML = part(ok, "var(--s1)", "Logged in", `${Math.round((ok / all) * 100)}%`) + part(bad, "var(--bad)", "✕ Wrong password", `✕ ${fmt(bad)}`);
+}
+
+function drawMade() {
+  const t = data.totals;
+  hbars($("made"), [
+    { label: "Photos read", value: t.photos, unit: "" },
+    { label: "Walk views", value: t.walk_views },
+    { label: "Jams", value: t.jams },
+    { label: "Friendships", value: t.friendships },
+    { label: "Chat messages", value: t.messages },
+  ].map((r) => ({ ...r, tip: `<b>${r.label}</b><br>${fmt(r.value)}` })));
+}
+
+function drawSpark() {
+  // accounts over the last 14 days (running total), current point in the accent
+  const el = $("spark"), W = el.clientWidth || 200, H = 36, n = data.totals.users;
+  const by = Object.fromEntries(data.signups_by_day.map((d) => [d.day, d.n]));
+  const days = []; for (let i = 13; i >= 0; i--) days.push(new Date(Date.now() - i * 864e5).toISOString().slice(0, 10));
+  let run = n - days.reduce((a, d) => a + (by[d] || 0), 0);
+  const pts = days.map((d) => (run += by[d] || 0));
+  const max = Math.max(1, ...pts), min = Math.min(...pts);
+  const X = (i) => 4 + (i / 13) * (W - 8), Y = (v) => H - 4 - ((v - min) / Math.max(1, max - min)) * (H - 8);
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}"><path d="M${pts.map((v, i) => `${X(i)},${Y(v)}`).join("L")}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${X(13)}" cy="${Y(pts[13])}" r="4" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/></svg>`;
+}
+
+function renderUsers() {
+  const q = $("q").value.trim().toLowerCase();
+  const list = data.users.filter((u) => !q || u.username.includes(q) || (u.name || "").toLowerCase().includes(q))
+    .sort((a, b) => ((a[sortKey] ?? "") > (b[sortKey] ?? "") ? 1 : (a[sortKey] ?? "") < (b[sortKey] ?? "") ? -1 : 0) * sortDir);
+  $("rows").innerHTML = list.map((u) => `<tr>
+    <td>@${esc(u.username)}</td><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td title="${esc(u.timezone)}">${flag(u.country)} ${esc(u.country || "–")}</td>
+    <td title="${esc(u.created_at)}">${when(u.created_at)}</td><td title="${esc(u.last_seen)}">${when(u.last_seen)}</td>
+    <td class="num">${u.login_count}</td><td class="num">${u.photos}</td><td class="num">${u.walk_views}</td>
+    <td class="num">${u.jams}</td><td class="num">${u.friends}</td></tr>`).join("") || `<tr><td colspan="11" class="muted">No users yet.</td></tr>`;
+}
+
+function render() {
+  const t = data.totals;
+  $("t-users").textContent = fmt(t.users);
+  $("t-users-note").textContent = `+${fmt(t.new_24h)} today`;
+  $("t-act1").textContent = fmt(t.active_1h);
+  $("t-act24").textContent = `${fmt(t.active_24h)} today`;
+  $("t-new7").textContent = fmt(t.new_7d);
+  $("t-new24").textContent = `${fmt(t.new_24h)} in the last 24 h`;
+  $("t-countries").textContent = data.geo === false ? "–" : fmt(t.countries);
+  const top = data.countries.find((c) => c.country !== "??");
+  $("t-countries-note").textContent = data.geo === false ? "not tracked yet" : top ? `most from ${countryName(top.country)}` : "";
+  $("nogeo").hidden = data.geo !== false;
+  drawSpark(); drawMap(); drawCountries(); drawSignups(); drawFunnel(); drawPlaces(); drawLogins(); drawMade(); renderUsers();
+  $("logins").innerHTML = data.recent_logins.map((l) => `<tr><td title="${esc(l.at)}">${when(l.at)}</td><td>${l.username === "(unknown name)" ? '<span class="muted">unknown name</span>' : "@" + esc(l.username)}</td><td>${flag(l.country)} ${esc(l.country || "–")}</td><td class="${l.ok ? "" : "bad-text"}">${l.ok ? "logged in" : "✕ wrong password"}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">No logins yet.</td></tr>`;
+  $("updated").textContent = `Updated ${new Date(data.now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · refreshes every 30 s`;
+}
+
+async function load() {
+  try {
+    const r = await fetch(API, { cache: "no-store" });
+    if (r.status === 401) { location.href = IN_APP ? "/login" : "/"; return; }
+    if (r.status === 403) { $("denied").hidden = false; $("dash").hidden = true; $("updated").textContent = ""; return; }
+    const out = await r.json();
+    if (!r.ok) throw new Error(out.error || r.status);
+    data = out; $("failed").hidden = true; $("dash").hidden = false; render();
+  } catch (e) {
+    $("updated").textContent = "Could not load, retrying…";
+    if (!data) { $("failed").hidden = false; $("failed").textContent = `Could not read the numbers: ${e.message}. If this is new, the dashboard's database key may be missing (see admin_site/README.md).`; }
+  }
+}
+
+// the land outline (Natural Earth, 110m), drawn once; the map works without it
+fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-110m.json").then((r) => r.json()).then((topo) => {
+  const f = topojson.feature(topo, topo.objects.land);
+  land = f.features.flatMap((x) => (x.geometry.type === "Polygon" ? [x.geometry.coordinates] : x.geometry.coordinates));
+  if (data) drawMap();
+}).catch(() => {});
+
+document.querySelectorAll("th[data-k]").forEach((th) => th.addEventListener("click", () => {
+  const k = th.dataset.k; sortDir = sortKey === k ? -sortDir : -1; sortKey = k; renderUsers();
+}));
+$("q").addEventListener("input", () => data && renderUsers());
+$("csv").addEventListener("click", () => {
+  if (!data) return;
+  const cols = ["username", "name", "email", "country", "timezone", "created_at", "last_seen", "login_count", "photos", "walk_views", "jams", "friends"];
+  const cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([[cols.join(","), ...data.users.map((u) => cols.map((c) => cell(u[c])).join(","))].join("\n")], { type: "text/csv" }));
+  a.download = `chroma-users-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+});
+let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => data && render(), 150); });
+load(); setInterval(load, 30000);
+</script>
+</body>
+</html>

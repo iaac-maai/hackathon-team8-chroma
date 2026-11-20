@@ -1,10 +1,10 @@
 // Sends one photo to Akshat's model server and gets its scene card back.
-// Server: "01_autoencoder/model_app" (Gradio), API name /predict.
+// Server: "Akshat - Image processing/01_autoencoder/model_app" (Gradio), API name /predict.
 //
 //   const card = await photoToCard(fileOrBlob, "photo_123", (msg) => console.log(msg));
 //
 // Another server (e.g. a local one on port 7860): put VITE_MODEL_URL=http://localhost:7860
-// in music/.env.local, or open chroma.html?model=http://localhost:7860
+// in Bo/.env.local, or open chroma.html?model=http://localhost:7860
 
 export const MODEL_URL = (
   new URLSearchParams(location.search).get("model")
