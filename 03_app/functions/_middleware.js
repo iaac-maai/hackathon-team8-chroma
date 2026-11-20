@@ -2,6 +2,7 @@
 // A visitor without a valid session only gets the login and sign-up pages and their APIs.
 // The logged-in user goes on as context.data.user: {id, username, name} or the team admin.
 import { readSession, TEAM, json, now, where } from "./_lib/auth.js";
+import { canSeeDashboard } from "./_lib/admins.js";
 
 // Pages serves login.html at /login (it drops the .html)
 const PUBLIC_PATHS = ["/login", "/login.html", "/register", "/register.html", "/api/login", "/api/register", "/api/logout", "/style.css", "/chroma-gradient.js"];
@@ -23,7 +24,12 @@ export async function onRequest(context) {
         .bind(user.id, now(), new Date(Date.now() - 60000).toISOString(), w.country, w.timezone, w.areaLat, w.areaLon).run();
     }
   }
-  if (user) { data.user = user; return next(); }
+  if (user) {
+    data.user = user;
+    // the team dashboard page is only for the three admins (ADMINS); everyone else goes home
+    if (/^\/admin(\.html)?\/?$/i.test(url.pathname) && !(await canSeeDashboard(env, user))) return Response.redirect(new URL("/", url), 302);
+    return next();
+  }
 
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/gradio_api/")) return json({ error: "Not logged in" }, 401);
   return Response.redirect(new URL("/login", url), 302);

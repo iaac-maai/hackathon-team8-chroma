@@ -16,6 +16,7 @@ export class JamClient {
     Object.assign(this, { jamId, me, engine, onState, onEvent });
     this.seq = 0; this.offset = 0; this.bestRtt = Infinity; this.running = false; this.timers = new Set();
     this.lastGrid = null; this.started = false; this.applied = 0;
+    this.driving = false;   // set by the page: true while this phone's camera makes the music
   }
   serverNow() { return Date.now() + this.offset; }
   measure(t0, t1, serverNow) {                       // NTP-style: the fastest round trip gives the best offset
@@ -101,7 +102,12 @@ export class JamClient {
         while (s % unit !== 0) s++;
         grid = { step: 0, at: Math.round(grid.at + (s - grid.step) * stepMs) };
       }
-      if (grid && d.bpm) { this.lastGrid = { ...grid, bpm: d.bpm }; this.keepInStep(late || this.applied <= 1); }
+      if (grid && d.bpm) this.lastGrid = { ...grid, bpm: d.bpm };
+      if (this.driving && L.grid().running) {
+        // the driver's own phone IS the beat: it never corrects itself against its older position, it only takes its
+        // own new tempo (correcting itself made its tempo wobble, and every listener chased the wobble)
+        if (d.bpm && Math.abs(L.grid().bpm - d.bpm) >= 0.5) L.setBpm(d.bpm);
+      } else if (grid && d.bpm) this.keepInStep(late || this.applied <= 1);
     } catch (err) { console.warn("jam apply", err); }
     this.onEvent?.(e);
   }

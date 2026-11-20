@@ -764,6 +764,7 @@ function jamHud(d = {}) {
 }
 async function setJamRole(role, driver) {
   const was = J.role; J.role = role;
+  if (J.client) J.client.driving = role === "driver";
   clearTimeout(J.viewTimer); clearInterval(J.tempoTimer);
   $("flip").hidden = role !== "driver";
   if (role === "driver") {
