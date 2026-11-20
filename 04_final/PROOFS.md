@@ -125,7 +125,16 @@ the git history."*):
 >   printed **no secret names** for production or preview. Check this in the Cloudflare dashboard (Pages → chroma-team8 →
 >   Settings → Variables and Secrets). Without `APP_PASSWORD` nobody can log in.
 
-_TODO (team): after the password is changed, re-run the check and replace this answer._
+**Re-check, Friday 20 November** (same question, on the final app):
+
+> - **chroma-jam (the final app):** `npx wrangler pages secret list --project-name chroma-jam` shows one secret,
+>   `SESSION_SECRET` (encrypted). There is **no `APP_PASSWORD`** on chroma-jam, so the old leaked team password
+>   does not log in there. Everyone uses their own account; the dashboard (`/admin`) opens only for the three admins in `ADMINS`.
+> - **This repo (files and full history):** no keys or tokens. The only password-like strings are throwaway test
+>   passwords in `03_app/scripts/social-smoke.mjs` (for test accounts made and used only by the test) and
+>   placeholder text in the docs.
+> - **Still open:** the old password still works on the older `chroma-team8` (Akshat's account). Akshat changes it there
+>   with `npx wrangler pages secret put APP_PASSWORD --project-name chroma-team8`.
 
 ## 5–6. Login and own data only
 
